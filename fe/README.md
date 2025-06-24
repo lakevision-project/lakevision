@@ -1,36 +1,30 @@
+# Lakevision Frontend (SvelteKit)
 
-## Setting up the project
+This is the SvelteKit frontend of Lakevision. It visualizes Iceberg table metadata and connects to the backend via REST API.
+
+## Running locally
+
+### Prerequisites
+
+- Node.js 18+
+
+### Setup
 
 ```bash
-# Clone the repo
-git clone git@github.ibm.com:rakeshj/lakevision.git
-
-```
-
-## Developing
-
-Once you've cloned the project, you can get to the project directory and then to the `fe` directory and install the dependencies with `npm install` (or `pnpm install` or `yarn`) start a development server:
-
-```bash
-cd lakevision/fe
-
 npm install
-
 ```
 
-## Start the development server
-Before starting the fe server, make sure the backend fastapi server is running. Set the environment variable pointing to the backend api server (e.g. http://localhost:8000)
-
+### Start the frontend
 ```bash
-export PUBLIC_API_SERVER=<api_server_address_and_port>
-
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+npm run dev -- --port 8081
 ```
 
-## Building
+Visit [http://localhost:8081](http://localhost:8081) to view the app.
+
+Environment configuration (e.g., API base URL) is handled at build time using `my.env` from the project root.
+
+
+### Building
 
 To create a production version of your app:
 
@@ -38,6 +32,10 @@ To create a production version of your app:
 npm run build
 ```
 
-You can preview the production build with `npm run preview`.
+You can preview the production build with:
+
+```bash
+npm run preview
+```
 
 > To deploy your app, you may need to install an [adapter](https://kit.svelte.dev/docs/adapters) for your target environment.
