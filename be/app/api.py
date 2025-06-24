@@ -22,8 +22,8 @@ CLIENT_SECRET       = os.getenv("OPEN_ID_CLIENT_SECRET", '')
 TOKEN_URL           = OPENID_PROVIDER_URL+"/token"
 SECRET_KEY          = os.getenv("SECRET_KEY", "@#dsfdds1112")
 
-AUTHZ_MODULE = os.getenv("AUTHZ_MODULE_NAME", "authz")
-AUTHZ_CLASS  = os.getenv("AUTHZ_CLASS_NAME", "Authz")
+AUTHZ_MODULE = os.getenv("AUTHZ_MODULE_NAME") or "authz"
+AUTHZ_CLASS  = os.getenv("AUTHZ_CLASS_NAME") or "Authz"
 
 class LVException(Exception):
     def __init__(self, name: str, message: str):
