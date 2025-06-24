@@ -1,81 +1,116 @@
 # Lakevision
 
-Lakevision is a tool which provides insights into your Data Lakehouse, based on `Apache Iceberg` table format.
+Lakevision is a tool that provides insights into your Data Lakehouse based on the **Apache Iceberg** table format.
 
-It provides all the namespaces available in your Lakehouse as well as all the tables available in each namespace, the tables' properties and schema, snapshots, partitions, sort-orders, references/tags as well as sample data. It also supports nested namespaces.
+It lists every namespace and table in your Lakehouse—along with each table’s schema, properties, snapshots, partitions, sort-orders, references/tags, and sample data—and supports nested namespaces. This helps you quickly understand data layout, file locations, and change history.
 
-This can be very helpful in finding data layout in your Apache Iceberg based Lakehouse, details, structure of each table, location of data and metadata files, change history, and a lot more. It heavily uses pyiceberg and has very few other dependencies.
+Lakevision is built with **pyiceberg**, a `FastAPI` backend, and a `SvelteKit` frontend, keeping other dependencies to a minimum.
 
-https://github.com/user-attachments/assets/7c71d61f-ffea-497a-97d0-451dec662b96
-
-
+![Lakevision screenshot](https://github.com/user-attachments/assets/7c71d61f-ffea-497a-97d0-451dec662b96)
 
 ## Features
 
-- Search and view all namespaces in your Lakehouse
+* Search and view all namespaces in your Lakehouse
+* Search and view all tables in your Lakehouse
+* Display schema, properties, partition specs, and a summary of each table
+* Show record count, file count, and size per partition
+* List all snapshots with details
+* Graphical summary of record additions over time
+* OIDC/OAuth-based authentication support
+* Pluggable authorization
+* Optional “Chat with Lakehouse” capability
 
-- Search and view all tables in your Lakehouse
+## Installation (Docker)
 
-- Schema, properties, partition specs, summary of each table
+The easiest way to run Lakevision is with Docker.
 
-- Every partition-wise record count, file count, size etc.
+1. **Clone the repository** and `cd` into the project root.
 
-- Show all snapshots with details
+2. **Build the image**
 
-- Graphical summary of records additions over time
+   ```bash
+   docker build -t lakevision:1.0 .
+   ```
 
-- OIDC/OAuth based authentication support
+3. **Set your configuration properties**
 
-- Pluggable authorization feature
+   Fill in your Iceberg catalog URL, authentication, and (optionally) AWS credentials in `my.env`.
 
-- Pluggable Chat with Lakehouse capability
+4. **Run the container**
 
-## How to install and use:
+   ```bash
+   docker run --env-file my.env -p 8081:8081 lakevision:1.0 /app/start.sh
+   ```
 
-The easiest way is to run it with Docker.
+If everything starts correctly you will see the backend listening on port 8000. Open [http://localhost:8081](http://localhost:8081) to use the UI.
 
-Build the image:
+Tested on Linux and macOS with the Iceberg REST catalog, but any catalog supported by **pyiceberg** should work.
 
-a. Clone this repo and cd to lakevision directory.
+## Running locally (terminal / VS Code)
 
-b. Build:
+To run Lakevision from source for debugging or development:
 
+### Prerequisites
+
+* Python 3.10+
+* Node.js 18+
+* A running Iceberg catalog
+
+### 1 — Set up Python backend
+
+```bash
+cd be
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
-docker build -t lakevision:1.0 .
+
+### 2 — Set up frontend (SvelteKit)
+
+```bash
+cd ../fe
+npm install
 ```
 
-Provide the configuration - you will need Iceberg Catalog URL, and authentication required by the catalog, AWS keys/configuration. Fill in these values in my.env file and provide it to the docker run command.
+### 3 — Set environment variables
 
-Run the docker image, like:
+Create a `.env` file in the project root or configure `my.env` with the necessary catalog information.
 
+### 4 — Run backend
+
+```bash
+cd ../be
+set -a; source ../my.env; set +a
+PYTHONPATH=app uvicorn app.api:app --reload --port 8000
 ```
-docker run --env-file my.env -it -p 8081:8081 lakevision:1.0 /app/start.sh
+
+### 5 — Run frontend
+
+```bash
+cd ../fe
+npm run dev
 ```
 
-The Lakevision application is built on `SvelteKit` and `Fastapi`. If everything built fine, you would see output on command line about the backend app listening on port 8000. Launch the browser http://localhost:8081 and you would see all the details of your Lakehouse.
-
-Tested on Linux and Mac with Iceberg REST catalog, but will support any catalog that works with pyiceberg.
+Visit [http://localhost:8081](http://localhost:8081) for the UI.
 
 ## Roadmap
 
-- Provide Chat with Lakehouse capability using LLM.
-
-- Provide overall reports on tables with maximum snapshots, maximum partitions, maximum columns, size etc.
-
-- Provide recommendations on optimizing table performance.
-
-- Provide limited SQL capabilities on tables.
-
-- Provide each partition details like name, filecount, number of records, file sizes etc. - Done
-
-- Provide ability to see sample data based on partitions. - Done
-
-- Add insights on tables.
-
-- Add timetravel capability.
+* Chat with Lakehouse capability using an LLM
+* Table-level reports (most snapshots, partitions, columns, size, etc.)
+* Optimization recommendations
+* Limited SQL capabilities
+* Partition details (name, file count, records, size) ✅
+* Sample data by partition ✅
+* Table-level insights
+* Time-travel queries
 
 Much more.....
 
 ## Contributing
 
-Contributions are very much welcome from all.
+Contributions are welcome!
+
+1. **Fork** the repository and clone it locally.
+2. **Create** a branch for your change, referencing an issue if one exists.
+3. **Add tests** for new functionality where appropriate.
+4. **Open a pull request** with a clear description of the changes.

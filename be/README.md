@@ -1,12 +1,24 @@
+# Lakevision Backend (FastAPI)
 
-Get to the `be` directory and start the fastapi server. 
-Make sure environment properties are set. 
+This is the FastAPI backend of Lakevision. It connects to the Apache Iceberg catalog, handles authentication/authorization, and exposes API endpoints consumed by the frontend.
 
-This should be done preferably in a python virtual env.
+## Running locally
+
+### Prerequisites
+
+- Python 3.10+
+- Environment variables configured via `../my.env`
+
+### Setup
 
 ```bash
-cd lakevision/be
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-cd lakevision/be/app
-fastapi dev api.py
+```
+
+### Start the server
+```bash
+set -a; source ../my.env; set +a
+PYTHONPATH=app uvicorn app.api:app --reload --port 8000
 ```
