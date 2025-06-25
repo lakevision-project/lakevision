@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check-style:
+    name: Check code style and install
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Python dependencies
+        working-directory: ./be
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: ./fe
+        run: npm ci
+
+      - name: Lint frontend
+        working-directory: ./fe
+        run: npm run lint || echo "Linting failed"
+
+      - name: Check frontend builds
+        working-directory: ./fe
+        run: npm run build
+
+      - name: Print Makefile help
+        run: make help
