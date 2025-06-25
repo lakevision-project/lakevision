@@ -29,7 +29,7 @@ init-be:
 	cd be && python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
 
 run-be:
-	cd be && set -a && source ../my.env && set +a && PYTHONPATH=app .venv/bin/uvicorn app.api:app --reload --port 8000
+	cd be && set -a && source ../.env && set +a && PYTHONPATH=app .venv/bin/uvicorn app.api:app --reload --port 8000
 
 clean-be:
 	rm -rf be/.venv

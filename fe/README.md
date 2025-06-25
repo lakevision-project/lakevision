@@ -21,8 +21,6 @@ npm run dev -- --port 8081
 
 Visit [http://localhost:8081](http://localhost:8081) to view the app.
 
-Environment configuration (e.g., API base URL) is handled at build time using `my.env` from the project root.
-
 
 ### Building
 

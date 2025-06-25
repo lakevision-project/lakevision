@@ -38,12 +38,18 @@ The easiest way to run Lakevision is with Docker.
 
 3. **Configure environment variables**
 
-   Fill in your Iceberg catalog URL, authentication, and (optionally) AWS credentials in `my.env`.
+   Copy `my.env` to `.env`:
+
+   ```bash
+   cp my.env .env
+   ```
+
+   Then edit `.env` to provide your Iceberg catalog URL, authentication, and (optionally) AWS or GCP credentials. This prevents accidental changes to `my.env` from being committed to version control.
 
 4. **Run the container**
 
    ```bash
-   docker run --env-file my.env -p 8081:8081 lakevision:1.0 /app/start.sh
+   docker run --env-file .env -p 8081:8081 lakevision:1.0 /app/start.sh
    ```
 
 Once started, the backend listens on port 8000. Visit [http://localhost:8081](http://localhost:8081) to explore the UI.
@@ -74,7 +80,13 @@ Once running, visit [http://localhost:8081](http://localhost:8081) to use the ap
 
 #### 1. Configure environment
 
-Fill in your Iceberg catalog URL, authentication, and (optionally) AWS credentials in `my.env`.
+Copy `my.env` to `.env`:
+
+```bash
+cp my.env .env
+```
+
+Then edit `.env` to provide your Iceberg catalog URL, authentication, and (optionally) AWS or GCP credentials. This prevents accidental changes to `my.env` from being committed to version control.
 
 #### 2. Backend
 
@@ -83,7 +95,7 @@ cd be
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-set -a; source ../my.env; set +a
+set -a; source ../.env; set +a
 PYTHONPATH=app uvicorn app.api:app --reload --port 8000
 ```
 
