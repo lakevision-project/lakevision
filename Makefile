@@ -39,7 +39,21 @@ clean-be:
 init-fe:
 	cd fe && npm install
 
-run-fe:
+prepare-fe-env:
+	mkdir -p fe
+	> fe/.env
+	while IFS= read -r line || [[ -n "$$line" ]]; do \
+	    if [[ -z "$$line" || "$$line" == \#* ]]; then \
+	        echo "$$line" >> fe/.env; \
+	        continue; \
+	    fi; \
+	    key=$$(echo "$$line" | awk -F'=' '{print $$1}' | xargs); \
+	    if [[ "$$key" == PUBLIC_* || "$$key" == VITE_* ]]; then \
+	        echo "$$line" >> fe/.env; \
+	    fi; \
+	done < .env
+
+run-fe: prepare-fe-env
 	cd fe && npm run dev -- --port 8081
 
 build-fe:

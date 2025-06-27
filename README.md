@@ -80,13 +80,24 @@ Once running, visit [http://localhost:8081](http://localhost:8081) to use the ap
 
 #### 1. Configure environment
 
-Copy `my.env` to `.env`:
+Start by copying `my.env` to `.env`:
 
 ```bash
 cp my.env .env
 ```
 
-Then edit `.env` to provide your Iceberg catalog URL, authentication, and (optionally) AWS or GCP credentials. This prevents accidental changes to `my.env` from being committed to version control.
+Then edit `.env` to provide values for your Iceberg catalog URL, authentication, and (optionally) AWS or GCP credentials.
+This avoids modifying `my.env`, which is version-controlled and used as a template.
+
+> 💡 **Frontend note:**
+> All environment variables that begin with `PUBLIC_` must be available in a separate `.env` file inside the `/fe` folder.
+> You can do this manually, or by running:
+
+```bash
+make prepare-fe-env
+```
+
+This ensures the frontend build system (Vite) can access the variables during development.
 
 #### 2. Backend
 
