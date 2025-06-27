@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lakevision-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lakevision-backend
+  template:
+    metadata:
+      labels:
+        app: lakevision-backend
+    spec:
+      imagePullSecrets:
+        - name: quay-cred
+      containers:
+        - name: backend
+          image: host/namespace/lakevision-backend:0.1
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: lakevision-backend-config
+            - secretRef:
+                name: lakevision-secrets
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lakevision-backend
+spec:
+  selector:
+    app: lakevision-backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP
