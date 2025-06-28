@@ -10,7 +10,9 @@ It lists every namespace and table in your Lakehouse—along with each table’s
 
 Lakevision is built with **pyiceberg**, a `FastAPI` backend, and a `SvelteKit` frontend, keeping other dependencies to a minimum.
 
-https://github.com/user-attachments/assets/7c71d61f-ffea-497a-97d0-451dec662b96
+
+[![Lakevision Overview](https://img.youtube.com/vi/2MzJnGTwiMc/0.jpg)](https://www.youtube.com/embed/2MzJnGTwiMc)
+
 
 ## Features
 
@@ -52,7 +54,7 @@ The easiest way to run Lakevision is with Docker.
    docker run --env-file .env -p 8081:8081 lakevision:1.0 /app/start.sh
    ```
 
-Once started, the backend listens on port 8000. Visit [http://localhost:8081](http://localhost:8081) to explore the UI.
+Once started, the backend listens on port 8000 and Nginx runs on port 8081. Visit [http://localhost:8081](http://localhost:8081) to explore the UI.
 
 > ✅ Tested on Linux and macOS with the Iceberg REST catalog. Other PyIceberg-compatible catalogs should work too.
 
