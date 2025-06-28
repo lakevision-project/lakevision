@@ -14,7 +14,9 @@ Lakevision is built with **pyiceberg**, a `FastAPI` backend, and a `SvelteKit` f
 
 
 
-https://github.com/user-attachments/assets/67973e2a-b5ac-4d38-9fb4-1f40d5e2cb3d
+
+
+https://github.com/user-attachments/assets/b6b2eef5-9f27-40ca-a80d-27b88d4a8cfd
 
 
 
