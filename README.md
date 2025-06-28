@@ -11,7 +11,11 @@ It lists every namespace and table in your Lakehouse—along with each table’s
 Lakevision is built with **pyiceberg**, a `FastAPI` backend, and a `SvelteKit` frontend, keeping other dependencies to a minimum.
 
 
-[![Lakevision Overview](https://img.youtube.com/vi/2MzJnGTwiMc/0.jpg)](https://www.youtube.com/embed/2MzJnGTwiMc)
+
+
+
+https://github.com/user-attachments/assets/67973e2a-b5ac-4d38-9fb4-1f40d5e2cb3d
+
 
 
 ## Features
@@ -125,7 +129,7 @@ npm run dev -- --port 8081
 * Chat with Lakehouse capability using an LLM
 * Table-level reports (most snapshots, partitions, columns, size, etc.)
 * Optimization recommendations
-* Limited SQL capabilities
+* Limited SQL capabilities ✅
 * Partition details (name, file count, records, size) ✅
 * Sample data by partition ✅
 * Table-level insights
