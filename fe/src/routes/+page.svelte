@@ -174,7 +174,7 @@
             sort_order_loading = false;  
         }
         try {        
-            if(selected==1 && partitions.length == 0){
+            if(selected==1 && partitions.length == 0 && !partitions_loading){
                 partitions_loading = true; 
                 partitions = await get_data(namespace+"."+table, "partitions");  
                 partitions_loading = false;  
@@ -194,7 +194,7 @@
             snapshots_loading = false;  
         }
         try {
-            if(selected==3 && sample_data.length == 0){
+            if(selected==3 && sample_data.length == 0 && !sample_data_loading){
                 sample_data_loading = true;
                 if($sample_limit>0){                     
                     sample_data = await get_data(namespace+"."+table, "sample?sample_limit="+$sample_limit);
@@ -209,7 +209,7 @@
             sample_data_loading = false;  
         }        
         try {
-            if(selected==4 && data_change.length == 0){
+            if(selected==5 && data_change.length == 0 && !data_change_loading){
                 data_change_loading = true;          
                 data_change = await get_data(namespace+"."+table, "data-change");              
                 data_change_loading = false;  
