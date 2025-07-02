@@ -145,3 +145,12 @@ Contributions are welcome!
 2. **Create** a branch for your change, referencing an issue if one exists.
 3. **Add tests** for new functionality where appropriate.
 4. **Open a pull request** with a clear description of the changes.
+
+<div align="center">
+  <a href="https://apache-iceberg.slack.com/join/shared_invite/zt-38eie4xmv-2v3kvRyFhNzv7BY~MBGtdQ#/shared-invite/email">
+    <img 
+      src="https://img.shields.io/badge/Lakevision-Join%20Slack-blue?logo=slack&style=flat-square" 
+      alt="Join Lakevision Slack" 
+      style="height:50px; border-radius:8px;">
+  </a>
+</div>
