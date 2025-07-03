@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 # Makefile for Lakevision development
 
 .PHONY: help init-be run-be lint-be clean-be \
