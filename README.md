@@ -1,6 +1,9 @@
 ![License](https://img.shields.io/github/license/lakevision-project/lakevision)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 ![GitHub stars](https://img.shields.io/github/stars/lakevision-project/lakevision?style=social)
+[![Join Slack](https://img.shields.io/badge/Slack-Join%20Us-blue?logo=slack)](https://apache-iceberg.slack.com/join/shared_invite/zt-38eie4xmv-2v3kvRyFhNzv7BY~MBGtdQ#/shared-invite/email)
+
+
 
 # Lakevision
 
@@ -145,3 +148,4 @@ Contributions are welcome!
 2. **Create** a branch for your change, referencing an issue if one exists.
 3. **Add tests** for new functionality where appropriate.
 4. **Open a pull request** with a clear description of the changes.
+
