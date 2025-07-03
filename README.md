@@ -1,7 +1,7 @@
 ![License](https://img.shields.io/github/license/lakevision-project/lakevision)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 ![GitHub stars](https://img.shields.io/github/stars/lakevision-project/lakevision?style=social)
-[![Slack](https://img.shields.io/badge/Lakevision-Join%20Slack-blue?logo=slack&style=flat-square)](https://apache-iceberg.slack.com/join/shared_invite/zt-38eie4xmv-2v3kvRyFhNzv7BY~MBGtdQ#/shared-invite/email)
+[![Join Slack](https://img.shields.io/badge/Slack-Join%20Us-blue?logo=slack)](https://apache-iceberg.slack.com/join/shared_invite/zt-38eie4xmv-2v3kvRyFhNzv7BY~MBGtdQ#/shared-invite/email)
 
 
 
