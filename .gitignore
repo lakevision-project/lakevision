@@ -3,3 +3,4 @@ dev/warehouse
 .DS_Store
 be/app/__pycache__
 be/.venv/
+be/warehouse/

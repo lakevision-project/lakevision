@@ -35,6 +35,25 @@ https://github.com/user-attachments/assets/b6b2eef5-9f27-40ca-a80d-27b88d4a8cfd
 * Pluggable authorization
 * Optional “Chat with Lakehouse” capability
 
+## ⚙️ Environment Setup
+
+Before running Lakevision, you'll need to create and configure your local `.env` file:
+
+```bash
+cp my.env .env
+```
+
+Then edit .env to provide values for:
+
+- Your Iceberg catalog configuration (URI, warehouse path, etc.)
+  
+  🧪 Don’t have a catalog yet? You can start with a sample one. See make [`make sample-catalog`](#with-makefile-recommended) in the Makefile section.
+
+- Authentication details (e.g., token or credentials)
+- Optional cloud settings (S3, GCP, etc.)
+
+This avoids modifying `my.env`, which is version-controlled and serves as a template.
+
 ## 🚀 Quick Start (Docker)
 
 The easiest way to run Lakevision is with Docker.
@@ -47,17 +66,9 @@ The easiest way to run Lakevision is with Docker.
    docker build -t lakevision:1.0 .
    ```
 
-3. **Configure environment variables**
+3. **Run the container**
 
-   Copy `my.env` to `.env`:
-
-   ```bash
-   cp my.env .env
-   ```
-
-   Then edit `.env` to provide your Iceberg catalog URL, authentication, and (optionally) AWS or GCP credentials. This prevents accidental changes to `my.env` from being committed to version control.
-
-4. **Run the container**
+   Make sure you’ve completed the [Environment Setup](#environment-setup) step first.
 
    ```bash
    docker run --env-file .env -p 8081:8081 lakevision:1.0 /app/start.sh
@@ -77,28 +88,26 @@ Once started, the backend listens on port 8000 and Nginx runs on port 8081. Visi
 
 ### 🔀 With Makefile (recommended)
 
+Make sure you’ve completed the [Environment Setup](#environment-setup) step first.
+
+You can use the Makefile to automate common setup steps:
+
 ```bash
-make init-be       # Set up Python backend
-make init-fe       # Install frontend dependencies
-make run-be        # Start backend (FastAPI)
-make run-fe        # Start frontend (SvelteKit)
-make help          # List all Makefile commands
+make init-be           # Set up Python backend
+make sample-catalog    # Populate a local Iceberg catalog with sample data
+make init-fe           # Install frontend dependencies
+make run-be            # Start backend (FastAPI)
+make run-fe            # Start frontend (SvelteKit)
+make help              # List all Makefile commands
 ```
 
 Once running, visit [http://localhost:8081](http://localhost:8081) to use the app.
 
-### ⚙️ Manual Setup (for advanced use)
+### 🔧 Manual Setup (for advanced use)
 
 #### 1. Configure environment
 
-Start by copying `my.env` to `.env`:
-
-```bash
-cp my.env .env
-```
-
-Then edit `.env` to provide values for your Iceberg catalog URL, authentication, and (optionally) AWS or GCP credentials.
-This avoids modifying `my.env`, which is version-controlled and used as a template.
+Make sure you’ve completed the [Environment Setup](#environment-setup) step first.
 
 > 💡 **Frontend note:**
 > All environment variables that begin with `PUBLIC_` must be available in a separate `.env` file inside the `/fe` folder.
