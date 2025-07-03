@@ -1,6 +1,9 @@
 ![License](https://img.shields.io/github/license/lakevision-project/lakevision)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 ![GitHub stars](https://img.shields.io/github/stars/lakevision-project/lakevision?style=social)
+[![Slack](https://img.shields.io/badge/Lakevision-Join%20Slack-blue?logo=slack&style=flat-square)](https://apache-iceberg.slack.com/join/shared_invite/zt-38eie4xmv-2v3kvRyFhNzv7BY~MBGtdQ#/shared-invite/email)
+
+
 
 # Lakevision
 
@@ -146,11 +149,3 @@ Contributions are welcome!
 3. **Add tests** for new functionality where appropriate.
 4. **Open a pull request** with a clear description of the changes.
 
-<div align="center">
-  <a href="https://apache-iceberg.slack.com/join/shared_invite/zt-38eie4xmv-2v3kvRyFhNzv7BY~MBGtdQ#/shared-invite/email">
-    <img 
-      src="https://img.shields.io/badge/Lakevision-Join%20Slack-blue?logo=slack&style=flat-square" 
-      alt="Join Lakevision Slack" 
-      style="height:50px; border-radius:8px;">
-  </a>
-</div>
