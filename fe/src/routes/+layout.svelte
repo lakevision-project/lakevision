@@ -166,19 +166,19 @@
 	}
 	
 	$: if(browser){
-		if(dropdown1_selectedId  && cc == 0 && !dropdown2_selectedId) {			
+		if(Number.isInteger(dropdown1_selectedId)  && cc == 0 && !Number.isInteger(dropdown2_selectedId) ) {	
 			get_tables(formatSelected(dropdown1_selectedId, data.namespaces));
 			cc++;
-		} else if (dropdown1_selectedId && dropdown2_selectedId){
+		} else if (Number.isInteger(dropdown1_selectedId) && Number.isInteger(dropdown2_selectedId)){
 			cc = 0;
 		}
-		else if((!dropdown1_selectedId && !dropdown2_selectedId) || !dropdown1_selectedId){
+		else if((!Number.isInteger(dropdown1_selectedId) && !Number.isInteger(dropdown2_selectedId)) || !Number.isInteger(dropdown1_selectedId)){
 			cc = 0;
 			selectedNamespce.set(""); 
 			selectedTable.set("");
 			dropdown2_selectedId = ''; 
 		}
-	}
+	}	
 	$: if(browser){selectedTable.set(formatSelected(dropdown2_selectedId, tables));}	
 
 	onMount(() => {		
