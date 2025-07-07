@@ -251,22 +251,24 @@
 
 <Content>    
     <Tile>
-        <div class="tile-content">
-          <dl class="namespace-table-list">
-            <dt>Namespace</dt>
-            <dd>{namespace}</dd>
-            <dt>Table</dt>
-            <dd>{table}</dd>   
-          </dl>          
+        <div class="tile-header">
+            <div class="tile-content">
+            <dl class="namespace-table-list">
+                <dt>Namespace</dt>
+                <dd>{namespace}</dd>
+                <dt>Table</dt>
+                <dd>{table}</dd>   
+            </dl>          
+            </div>
+            <div class="copy-button-container">
+                <CopyButton
+                text={url}
+                on:click={set_copy_url}
+                iconDescription="Copy table link"
+                feedback="Table link copied"
+                />
+            </div>
         </div>
-        <div class="copy-button-container">
-            <CopyButton
-              text={url}
-              on:click={set_copy_url}
-              iconDescription="Copy table link"
-              feedback="Table link copied"
-            />
-          </div>
       </Tile>
     <br />    
     <Tabs bind:selected>
@@ -399,7 +401,13 @@
   }
 
   .copy-button-container {
+    align-items: end;
     display: flex;
     justify-content: flex-end;
+  }
+
+  .tile-header {
+    display: flex;
+    justify-content: space-between;
   }
   </style>
