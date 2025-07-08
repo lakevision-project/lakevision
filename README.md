@@ -138,6 +138,16 @@ npm install
 npm run dev -- --port 8081
 ```
 
+
+## ☸️ Kubernetes Deployment
+
+Want to deploy Lakevision on Kubernetes or OpenShift?  
+Sample manifests are provided in [`k8s/`](k8s/), including example `Deployment`, `Service`, `ConfigMap`, and `Secret` YAMLs for running the unified (backend + frontend) container.
+
+- See [`k8s/README.md`](k8s/README.md) for quickstart instructions and customization notes.
+- You’ll need to edit the image name and environment variables before deploying.
+
+
 ## 🧭 Roadmap
 
 * Chat with Lakehouse capability using an LLM
