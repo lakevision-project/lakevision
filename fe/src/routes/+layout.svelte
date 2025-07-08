@@ -43,6 +43,10 @@
   	let q_tab = $page.url.searchParams.get('table');
 	let q_sample_limit = $page.url.searchParams.get('sample_limit');
 
+	if (q_sample_limit && Number.isInteger(parseInt(q_sample_limit))) {
+		sample_limit.set(parseInt(q_sample_limit));
+	}
+
 	export let data;
 	let isSideNavOpen = true;
 	let user;
