@@ -2,6 +2,7 @@
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 ![GitHub stars](https://img.shields.io/github/stars/lakevision-project/lakevision?style=social)
 [![Join Slack](https://img.shields.io/badge/Slack-Join%20Us-blue?logo=slack)](https://apache-iceberg.slack.com/join/shared_invite/zt-38eie4xmv-2v3kvRyFhNzv7BY~MBGtdQ#/shared-invite/email)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Try%20Now-brightgreen?logo=googlechrome)](http://lakevision.draco.res.ibm.com)
 
 
 
@@ -14,9 +15,7 @@ It lists every namespace and table in your Lakehouse—along with each table’s
 Lakevision is built with **pyiceberg**, a `FastAPI` backend, and a `SvelteKit` frontend, keeping other dependencies to a minimum.
 
 
-
-
-
+> 👉 Check the ["Live Demo"](http://lakevision.draco.res.ibm.com) to explore Lakevision’s features with sample data.
 
 
 https://github.com/user-attachments/assets/b6b2eef5-9f27-40ca-a80d-27b88d4a8cfd
