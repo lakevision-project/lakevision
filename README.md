@@ -78,6 +78,20 @@ Once started, the backend listens on port 8000 and Nginx runs on port 8081. Visi
 
 > ✅ Tested on Linux and macOS with the Iceberg REST catalog. Other PyIceberg-compatible catalogs should work too.
 
+<details>
+<summary><strong>🧪 Want to try the in-memory sample catalog?</strong></summary>
+
+To build the image with the sample in-memory Iceberg catalog included:
+
+```bash
+docker build --build-arg ENABLE_SAMPLE_CATALOG=true -t lakevision:1.0 .
+```
+
+- In your `.env`, comment out the default catalog settings and uncomment the sample catalog lines.
+- Then run the container as above
+
+</details> 
+
 ## 🛠️ Running Locally (Terminal or VS Code)
 
 ### Prerequisites
