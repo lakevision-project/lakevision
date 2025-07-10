@@ -14,8 +14,9 @@ It lists every namespace and table in your Lakehouse—along with each table’s
 
 Lakevision is built with **pyiceberg**, a `FastAPI` backend, and a `SvelteKit` frontend, keeping other dependencies to a minimum.
 
-
-> 👉 Check the ["Live Demo"](http://lakevision.draco.res.ibm.com) to explore Lakevision’s features with sample data.
+<!-- disable for now
+> 👉 Check the ["Live Demo"](http://host-tbd) to explore Lakevision’s features with sample data.
+-->
 
 
 https://github.com/user-attachments/assets/b6b2eef5-9f27-40ca-a80d-27b88d4a8cfd
