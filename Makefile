@@ -38,7 +38,8 @@ CHECK_VENV = \
 
 .PHONY: init-be
 init-be:
-	cd be && python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+	cd be && python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt -r requirements-dev.txt
+
 
 .PHONY: run-be
 run-be:
@@ -59,6 +60,11 @@ sample-catalog:
 clean-catalog:
 	@echo "🧹 Removing sample catalog and warehouse files..."
 	rm -rf be/warehouse/
+
+.PHONY: test-be
+test-be:
+	$(CHECK_VENV)
+	cd be && source ../.env && PYTHONPATH=app ../$(VENV_PYTHON) -m pytest tests
 
 # --- Frontend ---
 
