@@ -64,7 +64,7 @@ clean-catalog:
 .PHONY: test-be
 test-be:
 	$(CHECK_VENV)
-	cd be && source ../.env && PYTHONPATH=app ../$(VENV_PYTHON) -m pytest tests
+	cd be && PYTHONPATH=app ../$(VENV_PYTHON) -m pytest tests
 
 # --- Frontend ---
 
