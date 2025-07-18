@@ -30,7 +30,16 @@ jobs:
         run: |
           python -m venv .venv
           source .venv/bin/activate
-          pip install -r requirements.txt
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run backend tests
+        working-directory: ./be
+        env:
+          PYTHONPATH: app
+        run: |
+          source ../.env
+          . .venv/bin/activate
+          pytest tests
 
       - name: Install frontend dependencies
         working-directory: ./fe
