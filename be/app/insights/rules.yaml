@@ -1,0 +1,12 @@
+SMALL_FILES:
+  severity: Warning
+  message: "Table has many small data files: {num_files} files, average size {avg_size} bytes."
+  suggested_action: "Rewrite table to consolidate small files and optimize file size."
+NO_LOCATION:
+  severity: Critical
+  message: "Table has no location set."
+  suggested_action: "Set or correct the table location."
+UUID_COLUMN:
+  severity: Info
+  message: "Table uses UUID columns, which may be incompatible with some engines."
+  suggested_action: "Consider using a different column type."
