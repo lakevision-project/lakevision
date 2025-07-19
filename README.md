@@ -1,16 +1,28 @@
 
-<div align="center">
- <p align="center">
-    <img src="https://raw.githubusercontent.com/lakevision-project/lakevision/assets/lakevision1.png"  alt="lakevision logo">
-  </p>
-![License](https://img.shields.io/github/license/lakevision-project/lakevision)
-![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
-![GitHub stars](https://img.shields.io/github/stars/lakevision-project/lakevision?style=social)
-[![Join Slack](https://img.shields.io/badge/Lakevision-Join_Slack-blue?logo=slack)](https://apache-iceberg.slack.com/join/shared_invite/zt-38eie4xmv-2v3kvRyFhNzv7BY~MBGtdQ#/shared-invite/email)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/lakevision-project/lakevision/)
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Try%20Now-brightgreen?logo=googlechrome)](http://lakevision.draco.res.ibm.com)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/lakevision-project/lakevision/assets/lakevision1.png" alt="lakevision logo">
+</p>
 
-</div>
+<p align="center">
+  <a href="https://github.com/lakevision-project/lakevision/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/lakevision-project/lakevision" alt="License">
+  </a>
+  <a href="https://github.com/lakevision-project/lakevision/pulls">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome">
+  </a>
+  <a href="https://github.com/lakevision-project/lakevision/stargazers">
+    <img src="https://img.shields.io/github/stars/lakevision-project/lakevision?style=social" alt="GitHub stars">
+  </a>
+  <a href="https://apache-iceberg.slack.com/join/shared_invite/zt-38eie4xmv-2v3kvRyFhNzv7BY~MBGtdQ#/shared-invite/email">
+    <img src="https://img.shields.io/badge/Lakevision-Join_Slack-blue?logo=slack" alt="Join Slack">
+  </a>
+  <a href="https://deepwiki.com/lakevision-project/lakevision/">
+    <img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki">
+  </a>
+  <a href="http://lakevision.draco.res.ibm.com">
+    <img src="https://img.shields.io/badge/Live%20Demo-Try%20Now-brightgreen?logo=googlechrome" alt="Live Demo">
+  </a>
+</p>
 
 # Lakevision
 
