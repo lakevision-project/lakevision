@@ -6,6 +6,8 @@ from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import JSONResponse
 from lakeviewer import LakeView
+from app.insights.runner import InsightsRunner
+from fastapi import Query
 from typing import Generator
 from pyiceberg.table import Table
 import time, os, requests
@@ -233,6 +235,44 @@ def get_token(request: Request, tokenReq: TokenRequest):
 def logout(request: Request):
     request.session.pop("user", None)
     return RedirectResponse(REDIRECT_URI)
+
+# Insights API
+@app.get("/api/tables/{table_id}/insights")
+def get_table_insights(table_id: str, request: Request):
+    runner = InsightsRunner(lv)
+    try:
+        results = runner.run_for_table(table_id)
+        return [insight.__dict__ for insight in results]
+    except Exception as e:
+        logging.error(f"Insights error for table {table_id}: {str(e)}")
+        raise LVException("insight", f"Failed to compute insights for table {table_id}: {e}")
+
+
+@app.get("/api/namespaces/{namespace}/insights")
+def get_namespace_insights(
+    namespace: str, 
+    recursive: bool = Query(True, description="Search nested namespaces recursively?")
+):
+    runner = InsightsRunner(lv)
+    try:
+        results = runner.run_for_namespace(namespace, recursive=recursive)
+        # results is a dict of {qualified_table_name: [Insight, ...]}
+        return {k: [ins.__dict__ for ins in v] for k, v in results.items()}
+    except Exception as e:
+        logging.error(f"Insights error for namespace {namespace}: {str(e)}")
+        raise LVException("insight", f"Failed to compute insights for namespace {namespace}: {e}")
+
+
+@app.get("/api/lakehouse/insights")
+def get_lakehouse_insights():
+    runner = InsightsRunner(lv)
+    try:
+        results = runner.run_for_lakehouse()
+        return {k: [ins.__dict__ for ins in v] for k, v in results.items()}
+    except Exception as e:
+        logging.error(f"Insights error for lakehouse: {str(e)}")
+        raise LVException("insight", f"Failed to compute lakehouse insights: {e}")
+
 
 def clean_cache():
     """Remove expired entries from the cache."""
