@@ -1,6 +1,6 @@
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/lakevision-project/lakevision/assets/lakevision1.png" alt="lakevision logo">
+  <img src="https://github.com/lakevision-project/lakevision/blob/main/assets/lakevision1.png" alt="lakevision logo">
 </p>
 
 <p align="center">
