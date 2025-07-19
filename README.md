@@ -1,10 +1,16 @@
+
+<div align="center">
+ <p align="center">
+    <img src="https://raw.githubusercontent.com/lakevision-project/lakevision/assets/lakevision1.png"  alt="lakevision logo">
+  </p>
 ![License](https://img.shields.io/github/license/lakevision-project/lakevision)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 ![GitHub stars](https://img.shields.io/github/stars/lakevision-project/lakevision?style=social)
-[![Join Slack](https://img.shields.io/badge/Slack-Join%20Us-blue?logo=slack)](https://apache-iceberg.slack.com/join/shared_invite/zt-38eie4xmv-2v3kvRyFhNzv7BY~MBGtdQ#/shared-invite/email)
+[![Join Slack](https://img.shields.io/badge/Lakevision-Join_Slack-blue?logo=slack)](https://apache-iceberg.slack.com/join/shared_invite/zt-38eie4xmv-2v3kvRyFhNzv7BY~MBGtdQ#/shared-invite/email)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/lakevision-project/lakevision/)
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Try%20Now-brightgreen?logo=googlechrome)](http://lakevision.draco.res.ibm.com)
 
-
+</div>
 
 # Lakevision
 
