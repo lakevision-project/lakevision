@@ -1,6 +1,6 @@
 
 <script>
-    import { Tile, ExpandableTile, Content, Tabs, Tab, TabContent, Grid, Row, Column, CopyButton, ToastNotification, DataTableSkeleton } from "carbon-components-svelte";
+    import { Tile, ExpandableTile, Dropdown, Content, Tabs, Tab, TabContent, Grid, Row, Column, CopyButton, ToastNotification, DataTableSkeleton } from "carbon-components-svelte";
     import { selectedNamespce } from '$lib/stores';
     import { selectedTable } from '$lib/stores';
     import { sample_limit } from '$lib/stores';
@@ -12,6 +12,7 @@
     import VirtualTable from '../lib/components/VirtTable3.svelte';
     import { goto } from "$app/navigation";
     import QueryRunner from '../lib/components/QueryRunner.svelte';
+    import { get } from 'svelte/store';
 
     let namespace;    
     let table;
@@ -47,6 +48,42 @@
     let data_change = [];
     let data_change_loading = false;
     let access_allowed = true;
+
+    let lastSampleLimit = null;
+
+    let sampleLimits = [
+        { id: 10, label: "10" },
+        { id: 50, label: "50" },
+        { id: 100, label: "100" },
+        { id: 500, label: "500" },
+        { id: 1000, label: "1000" },
+        { id: 10000, label: "10000" }
+    ];
+
+    if (!sampleLimits.find(item => item.id === get(sample_limit))) {
+        sampleLimits.push({
+            id: get(sample_limit),
+            label: get(sample_limit).toString()
+        })
+    }
+
+    sampleLimits = sampleLimits.sort((a, b) => {
+		if (a.id < b.id) return -1;
+		if (a.id > b.id) return 1;
+		return 0;
+	})
+
+    let selectedLimit = sampleLimits.find(item => item.id === get(sample_limit));
+
+    // Ensure store and local variable are in sync at startup
+    sample_limit.set(selectedLimit.id);
+
+    selectedLimit = sampleLimits.find(item => item.id === selectedLimit.id);
+
+    // Keep store in sync when dropdown changes
+    $: if (selectedLimit) {
+        sample_limit.set(selectedLimit.id);
+    }
 
     async function get_namespace_special_properties(namespace_name){        
         ns_props = await fetch(
@@ -101,7 +138,7 @@
                 access_allowed = false;
                 return error
             }else if (res.status === 401) {
-                goto("/api/login?namespace="+namespace+"&table="+table+"&sample_limit=100");
+                goto("/api/login?namespace="+namespace+"&table="+table+"&sample_limit=${$sample_limit}");
 			}
             else{
                 console.error("Failed to fetch data:", res.statusText);
@@ -115,6 +152,22 @@
     let selected = 0; 
     $: reset(table);
     let callOnce = 0;
+
+    async function fetchSampleData() {
+        sample_data_loading = true;
+        try {
+            sample_data = await get_data(namespace + "." + table, `sample?sample_limit=${$sample_limit}`);
+            lastSampleLimit = $sample_limit;
+        } catch (err) {
+            error = err.message;
+        } finally {
+            sample_data_loading = false;
+        }
+    }
+
+    $: if (selected === 3 && $sample_limit !== lastSampleLimit && !sample_data_loading && namespace && table) {
+       fetchSampleData();
+    }
 
     $: (async () => {
         if( table === '') return;     
@@ -195,14 +248,7 @@
         }
         try {
             if(selected==3 && sample_data.length == 0 && !sample_data_loading){
-                sample_data_loading = true;
-                if($sample_limit>0){                     
-                    sample_data = await get_data(namespace+"."+table, "sample?sample_limit="+$sample_limit);
-                }  
-                else{
-                    sample_data = await get_data(namespace+"."+table, "sample");
-                }
-                sample_data_loading = false;
+                fetchSampleData();
             }
         } catch (err) {
             error = err.message;
@@ -223,10 +269,11 @@
 
     function set_copy_url(){
         url = window.location.origin;
-        url = url+"/?namespace="+namespace+"&table="+table+"&sample_limit=100";
+        url = url+"/?namespace="+namespace+"&table="+table+"&sample_limit=${$sample_limit}";
     }
 
     function reset(table){
+        lastSampleLimit = null;
         partitions = [];
         snapshots = [];
         sample_data = [];
@@ -352,12 +399,27 @@
             </TabContent>
 
             <TabContent><br/>
+                <div class="sample-lable">Select # of rows to sample</div>
+                <Dropdown
+                    hideLabel
+                    items={sampleLimits}
+                    selectedId={selectedLimit.id}
+                    selectedItem={selectedLimit}
+                    label="Sample Limit"
+                    titleText="Sample Limit"
+                    itemToString={item => item?.label}
+                    on:select={(e) => {
+                        selectedLimit = e.detail.selectedItem;
+                        sample_limit.set(selectedLimit.id);
+                        fetchSampleData();
+                    }}
+                />
                 {#if sample_data_loading}
                     <Loading withOverlay={false} small />    
                 {:else if !access_allowed}   
                     <ToastNotification hideCloseButton title="No Access" subtitle="You don't have access to the table data"></ToastNotification>  
                 {:else if sample_data.length > 0}
-                    <VirtualTable data={sample_data} columns={sample_data[0]} rowHeight={35} enableSearch=true/>
+                    <VirtualTable data={sample_data} columns={sample_data[0]} rowHeight={35} tableHeight={sample_data.length>13?500:(sample_data.length+1)*35} enableSearch=true/>
                     <br />
                     Sample items: {sample_data.length}
                 {/if}
@@ -377,6 +439,9 @@
   </Content>
 
   <style>
+   .sample-lable {
+    margin-bottom:20px;
+   }
 
    .tile-content {
     display: flex;

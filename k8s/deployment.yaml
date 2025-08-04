@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lakevision
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lakevision
+  template:
+    metadata:
+      labels:
+        app: lakevision
+    spec:
+      imagePullSecrets:
+        - name: quay-cred
+      containers:
+        - name: lakevision
+          image: registry-host/namespace/lakevision:tag
+          command: ["/bin/bash", "-c", "/app/start.sh"]
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: lakevision-config
+            - secretRef:
+                name: lakevision-secrets
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lakevision
+spec:
+  selector:
+    app: lakevision
+  ports:
+    - port: 8081
+      targetPort: 8081
+  type: ClusterIP

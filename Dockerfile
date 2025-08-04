@@ -31,6 +31,22 @@ RUN rm -f package-lock.json && rm -rf node_modules
 RUN npm install --package-lock-only
 RUN npm ci
 RUN npm install
+
+ARG ENABLE_SAMPLE_CATALOG=false
+
+# Copy sample loader into the container
+COPY scripts/load_sample_data.py /app/scripts/load_sample_data.py
+
+RUN if [ "$ENABLE_SAMPLE_CATALOG" = "true" ]; then \
+      echo "🧪 Loading sample catalog for quickstart..." && \
+      cd /app/be && \
+      export PYICEBERG_CATALOG__DEFAULT__URI=sqlite:////app/warehouse/sql-catalog.db && \
+      export PYICEBERG_CATALOG__DEFAULT__WAREHOUSE=file:///app/warehouse \
+      export PYTHONPATH=app && \
+      env && \
+      python3 /app/scripts/load_sample_data.py; \
+    fi
+
 #fix later, this is for OCP
 RUN chmod -R 777 /app/fe/ && chmod -R 777 /var/lib/nginx/
 EXPOSE 3000 8000 8081

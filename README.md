@@ -1,9 +1,28 @@
-![License](https://img.shields.io/github/license/lakevision-project/lakevision)
-![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
-![GitHub stars](https://img.shields.io/github/stars/lakevision-project/lakevision?style=social)
-[![Join Slack](https://img.shields.io/badge/Slack-Join%20Us-blue?logo=slack)](https://apache-iceberg.slack.com/join/shared_invite/zt-38eie4xmv-2v3kvRyFhNzv7BY~MBGtdQ#/shared-invite/email)
 
+<p align="center">
+  <img src="https://github.com/lakevision-project/lakevision/blob/main/assets/lakevision1.png" alt="lakevision logo">
+</p>
 
+<p align="center">
+  <a href="https://github.com/lakevision-project/lakevision/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/lakevision-project/lakevision" alt="License">
+  </a>
+  <a href="https://github.com/lakevision-project/lakevision/pulls">
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome">
+  </a>
+  <a href="https://github.com/lakevision-project/lakevision/stargazers">
+    <img src="https://img.shields.io/github/stars/lakevision-project/lakevision?style=social" alt="GitHub stars">
+  </a>
+  <a href="https://apache-iceberg.slack.com/join/shared_invite/zt-38eie4xmv-2v3kvRyFhNzv7BY~MBGtdQ#/shared-invite/email">
+    <img src="https://img.shields.io/badge/Lakevision-Join_Slack-blue?logo=slack" alt="Join Slack">
+  </a>
+  <a href="https://deepwiki.com/lakevision-project/lakevision/">
+    <img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki">
+  </a>
+  <a href="https://lakevision-demo.1ygdbovivg6p.us-east.codeengine.appdomain.cloud/">
+    <img src="https://img.shields.io/badge/Live%20Demo-Try%20Now-brightgreen?logo=googlechrome" alt="Live Demo">
+  </a>
+</p>
 
 # Lakevision
 
@@ -13,10 +32,9 @@ It lists every namespace and table in your Lakehouse—along with each table’s
 
 Lakevision is built with **pyiceberg**, a `FastAPI` backend, and a `SvelteKit` frontend, keeping other dependencies to a minimum.
 
-
-
-
-
+<!-- disable for now
+> 👉 Check the ["Live Demo"](http://host-tbd) to explore Lakevision’s features with sample data.
+-->
 
 
 https://github.com/user-attachments/assets/b6b2eef5-9f27-40ca-a80d-27b88d4a8cfd
@@ -78,6 +96,20 @@ Once started, the backend listens on port 8000 and Nginx runs on port 8081. Visi
 
 > ✅ Tested on Linux and macOS with the Iceberg REST catalog. Other PyIceberg-compatible catalogs should work too.
 
+<details>
+<summary><strong>🧪 Want to try the in-memory sample catalog?</strong></summary>
+
+To build the image with the sample in-memory Iceberg catalog included:
+
+```bash
+docker build --build-arg ENABLE_SAMPLE_CATALOG=true -t lakevision:1.0 .
+```
+
+- In your `.env`, comment out the default catalog settings and uncomment the sample catalog lines.
+- Then run the container as above
+
+</details> 
+
 ## 🛠️ Running Locally (Terminal or VS Code)
 
 ### Prerequisites
@@ -137,6 +169,16 @@ cd ../fe
 npm install
 npm run dev -- --port 8081
 ```
+
+
+## ☸️ Kubernetes Deployment
+
+Want to deploy Lakevision on Kubernetes or OpenShift?  
+Sample manifests are provided in [`k8s/`](k8s/), including example `Deployment`, `Service`, `ConfigMap`, and `Secret` YAMLs for running the unified (backend + frontend) container.
+
+- See [`k8s/README.md`](k8s/README.md) for quickstart instructions and customization notes.
+- You’ll need to edit the image name and environment variables before deploying.
+
 
 ## 🧭 Roadmap
 

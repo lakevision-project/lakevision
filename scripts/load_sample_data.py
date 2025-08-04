@@ -21,8 +21,24 @@ if not uri or not warehouse_uri:
 warehouse_path = urlparse(warehouse_uri).path
 sqlite_path = urlparse(uri).path
 
-TABLE_NAME = "default.taxi_dataset"
-DATA_URL = "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2023-01.parquet"
+sample_files = [
+    {
+        "url": "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2023-01.parquet",
+        "table": "nyc_taxi",
+        "description": "NYC Yellow Taxi Trips Jan 2023"
+    },
+    {
+        "url": "https://github.com/RandomFractals/chicago-crimes/raw/refs/heads/main/data/crimes-2022.parquet?raw=true",
+        "table": "chicago_crime",
+        "description": "Sample of Chicago crime incidents"
+    },
+    {
+        "url": "https://huggingface.co/datasets/princeton-nlp/SWE-bench_Verified/resolve/main/data/test-00000-of-00001.parquet?download=true",
+        "table": "SWE_bench_Verified",
+        "description": "SWE-bench Verified is a subset of 500 samples from the SWE-bench test set, which have been human-validated for quality",
+    },
+]
+
 
 def ensure_warehouse():
     os.makedirs(warehouse_path, exist_ok=True)
@@ -42,30 +58,31 @@ def load_catalog():
     )
 
 
-def download_data():
-    logger.info(f"🌐 Downloading sample data from: {DATA_URL}")
+def download_data(url):
+    logger.info(f"🌐 Downloading sample data from: {url}")
     fs = fsspec.filesystem("http")
-    return pq.read_table(DATA_URL, filesystem=fs)
+    return pq.read_table(url, filesystem=fs)
 
 
-def create_table_if_missing(cat):
-    if cat.table_exists(TABLE_NAME):
-        logger.info(f"📄 Table already exists: {TABLE_NAME}")
+def create_table_if_missing(cat, table_name, url):
+    if cat.table_exists(table_name):
+        logger.info(f"📄 Table already exists: {table_name}")
         return
 
-    logger.info(f"🛠️ Creating new table: {TABLE_NAME}")
-    table = download_data()
-    cat.create_table(identifier=TABLE_NAME, schema=table.schema)
-    cat.load_table(TABLE_NAME).append(table)
-    logger.info(f"✅ Loaded {table.num_rows} rows into {TABLE_NAME}")
+    logger.info(f"🛠️ Creating new table: {table_name}")
+    table = download_data(url)
+    cat.create_table(identifier=table_name, schema=table.schema)
+    cat.load_table(table_name).append(table)
+    logger.info(f"✅ Loaded {table.num_rows} rows into {table_name}")
 
 
 def main():
     ensure_warehouse()
     cat = load_catalog()
     cat.create_namespace_if_not_exists("default")
-    create_table_if_missing(cat)
-
+    for sample in sample_files:
+        table_name = f'default.{sample["table"]}'
+        create_table_if_missing(cat, table_name, sample["url"])
 
 if __name__ == "__main__":
     main()
