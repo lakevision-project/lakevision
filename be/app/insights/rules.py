@@ -7,6 +7,8 @@ import os
 
 rules_yaml_path = os.path.join(os.path.dirname(__file__), "rules.yaml")
 
+ONE_GB_IN_BYTES = 1000**3  # 1 GB in bytes (1024**3 is the actual value)
+
 # Load yaml at app startup
 with open(rules_yaml_path) as f:
     INSIGHT_META = yaml.safe_load(f)
@@ -23,8 +25,9 @@ def rule_small_files(table: Table) -> Optional[Insight]:
     files = [file_scan_task.file.file_size_in_bytes for file_scan_task in table.scan().plan_files()]
     if not files:
         return None
-    avg_size = sum(files) / len(files)
-    if len(files) > 100 and avg_size < 100_000:
+    len_files = len(files)
+    avg_size = sum(files) / len_files
+    if len_files > 100 and avg_size < 100_000:
         meta = INSIGHT_META["SMALL_FILES"]
         return Insight(
             code="SMALL_FILES",
@@ -47,5 +50,23 @@ def rule_no_location(table: Table) -> Optional[Insight]:
         )
     return None
 
-ALL_RULES = [rule_small_files, rule_no_location]
+def rule_large_files(table: Table) -> Optional[Insight]:
+    files = [file_scan_task.file.file_size_in_bytes for file_scan_task in table.scan().plan_files()]
+    if not files:
+        return None
+    avg_size = sum(files) / len(files)
+    large_files = [file_size for file_size in files if file_size >= ONE_GB_IN_BYTES]
+    num_large_files = len(large_files)
+    if num_large_files >= 1:
+        meta = INSIGHT_META["LARGE_FILES"]
+        return Insight(
+            code="LARGE_FILES",
+            table=qualified_table_name(table.name()),
+            message=meta["message"].format(num_files=len(files), avg_size=int(avg_size), num_large_files=num_large_files, max_size=ONE_GB_IN_BYTES),
+            severity=meta["severity"],
+            suggested_action=meta["suggested_action"]
+        )
+    return None
+
+ALL_RULES = [rule_small_files, rule_no_location, rule_large_files]
 
