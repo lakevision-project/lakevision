@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from app.insights.utils import qualified_table_name
 import yaml
 import os
+import pyarrow.compute as pc
 
 rules_yaml_path = os.path.join(os.path.dirname(__file__), "rules.yaml")
 
@@ -140,5 +141,38 @@ def rule_column_uuid_table(table: Table) -> Optional[Insight]:
         )
     return None
 
-ALL_RULES = [rule_small_files, rule_no_location, rule_large_files, rule_small_files_large_table, rule_column_uuid_table]
+def rule_no_rows_table(table: Table) -> Optional[Insight]:
+    empty: bool = False
+    print(f"rule_no_rows_table: {table.name()}")
+    if table.metadata.current_snapshot_id:
+        paTable = table.inspect.snapshots().sort_by([('committed_at', 'descending')]).select(['summary', 'committed_at'])          
+        result = dict(paTable.to_pydict()['summary'][0])
+        total_records = int(result.get("total-records", -1))
+        # snapshot summary doesn't always contains following 3 properties (total_records,total_file_size, total_data_files) hence getting from files meta, which is slower
+        if total_records == -1:
+            files_meta = table.inspect.files().select(['record_count'])
+            total_records = pc.sum(files_meta['record_count']).as_py()
+        empty = not (total_records > 0)
+    else:
+        empty = True
+
+    if empty:
+        meta = INSIGHT_META["NO_ROWS_TABLE"]
+        return Insight(
+            code="NO_ROWS_TABLE",
+            table=qualified_table_name(table.name()),
+            message=meta["message"],
+            severity=meta["severity"],
+            suggested_action=meta["suggested_action"]
+        )
+    return None
+
+ALL_RULES = [
+    rule_small_files, 
+    rule_no_location, 
+    rule_large_files, 
+    rule_small_files_large_table, 
+    rule_column_uuid_table, 
+    rule_no_rows_table
+]
 

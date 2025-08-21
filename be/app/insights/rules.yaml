@@ -18,3 +18,7 @@ SMALL_FILES_LARGE_TABLE:
   severity: Warning
   message: "Table with {avg_size} bytes average size and total size {total_size}."
   suggested_action: "Rewrite table to merge small files and improve efficiency"
+NO_ROWS_TABLE:
+  severity: Suggestion
+  message: "Table with zero rows (possibly orphaned or unneeded)"
+  suggested_action: "Remove or archive unused tables."

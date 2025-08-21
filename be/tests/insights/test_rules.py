@@ -12,7 +12,7 @@ from pyiceberg.types import (
 from pyiceberg.schema import Schema
 from app.insights.rules import search_for_uuid_column
 
-def make_mock_table(name, file_count=200, file_size=50_000, location=None):
+def make_mock_table(name, file_count=200, file_size=50_000, location=None, schema=Schema(NestedField(field_id=1, name="field_1", field_type=StringType()))):
     mock_file = MagicMock()
     mock_file.file.file_size_in_bytes = file_size
 
@@ -23,6 +23,19 @@ def make_mock_table(name, file_count=200, file_size=50_000, location=None):
     mock_table.name = MagicMock(return_value=name)
     mock_table.scan.return_value = mock_scan
     mock_table.location = location
+    mock_table.schema.return_value = schema
+
+    # Set a current_snapshot_id to simulate a non-empty table
+    mock_table.metadata.current_snapshot_id = None if file_count == 0 else 12345
+    # Define the return value for the inspect.snapshots() method when not empty
+    mock_pa_table = MagicMock()
+    mock_pa_table.to_pydict.return_value = {
+        'summary': [{'total-records': 10}],
+        'committed_at': [1678886400]
+    }
+    # Chain the mock methods: inspect.snapshots().sort_by().select()
+    mock_table.inspect.snapshots.return_value.sort_by.return_value.select.return_value = mock_pa_table
+
     return mock_table
     
 
@@ -31,11 +44,12 @@ class MockLakeView:
     def __init__(self):
         self.tables = {
             "namespace1.table1": make_mock_table("table1", 200, 50_000, None),
-            "namespace1.table2": make_mock_table("table2", 10, 1024**3, "some_location"),
+            "namespace1.table2": make_mock_table("table2", 10, 1024**3, "some_location", Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=UUIDType()))),
             "namespace1.table3": make_mock_table("table3", 1_200_000, 49_000, "some_location"),
+            "namespace1.table4": make_mock_table("table4", 0, 0, "some_location"),
         }
         self.ns_tables = {
-            "namespace1": ["namespace1.table1", "namespace1.table2", "namespace1.table3"],
+            "namespace1": ["namespace1.table1", "namespace1.table2", "namespace1.table3", "namespace1.table4"],
         }
         self.namespaces = [["namespace1"]]
 
@@ -54,15 +68,17 @@ class MockLakeView:
 
 table_rules = {
     'namespace1.table1':["SMALL_FILES", "NO_LOCATION"],
-    'namespace1.table2':["LARGE_FILES"], 
-    'namespace1.table3':["SMALL_FILES", "SMALL_FILES_LARGE_TABLE"]
+    'namespace1.table2':["LARGE_FILES", "UUID_COLUMN"], 
+    'namespace1.table3':["SMALL_FILES", "SMALL_FILES_LARGE_TABLE"],
+    'namespace1.table4':["NO_ROWS_TABLE"]
 }
 
 
 @pytest.mark.parametrize("table", [
         ('namespace1.table1'), 
         ('namespace1.table2'), 
-        ('namespace1.table3')
+        ('namespace1.table3'),
+        ('namespace1.table4')
     ])
 def test_run_for_table(table):
     lakeview = MockLakeView()
@@ -78,12 +94,15 @@ def test_run_for_namespace():
     assert "namespace1.table1" in ns_results
     assert "namespace1.table2" in ns_results
     assert "namespace1.table3" in ns_results
+    assert "namespace1.table4" in ns_results
     codes1 = {r.code for r in ns_results["namespace1.table1"]}
     codes2 = {r.code for r in ns_results["namespace1.table2"]}
     codes3 = {r.code for r in ns_results["namespace1.table3"]}
+    codes4 = {r.code for r in ns_results["namespace1.table4"]}
     assert set(codes1) == set(table_rules["namespace1.table1"])
     assert set(codes2) == set(table_rules["namespace1.table2"])
     assert set(codes3) == set(table_rules["namespace1.table3"])
+    assert set(codes4) == set(table_rules["namespace1.table4"])
 
 def test_run_for_lakehouse():
     lakeview = MockLakeView()
@@ -95,9 +114,11 @@ def test_run_for_lakehouse():
     codes1 = [r.code for r in all_results["namespace1.table1"]]
     codes2 = [r.code for r in all_results["namespace1.table2"]]
     codes3 = [r.code for r in all_results["namespace1.table3"]]
+    codes4 = {r.code for r in all_results["namespace1.table4"]}
     assert set(codes1) == set(table_rules["namespace1.table1"])
     assert set(codes2) == set(table_rules["namespace1.table2"])
     assert set(codes3) == set(table_rules["namespace1.table3"])
+    assert set(codes4) == set(table_rules["namespace1.table4"])
 
 
 @pytest.mark.parametrize("schema,expected", [
