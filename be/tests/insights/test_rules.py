@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
-from app.insights.rules import rule_small_files, rule_no_location, Insight
+from app.insights.rules import rule_small_files, rule_no_location, Insight, ALL_RULES
 from app.insights.runner import InsightsRunner
+import pytest
 
 def make_mock_table(name, file_count=200, file_size=50_000, location=None):
     mock_file = MagicMock()
@@ -14,6 +15,7 @@ def make_mock_table(name, file_count=200, file_size=50_000, location=None):
     mock_table.scan.return_value = mock_scan
     mock_table.location = location
     return mock_table
+    
 
 
 class MockLakeView:
@@ -21,9 +23,10 @@ class MockLakeView:
         self.tables = {
             "namespace1.table1": make_mock_table("table1", 200, 50_000, None),
             "namespace1.table2": make_mock_table("table2", 10, 1024**3, "some_location"),
+            "namespace1.table3": make_mock_table("table3", 1_200_000, 49_000, "some_location"),
         }
         self.ns_tables = {
-            "namespace1": ["namespace1.table1", "namespace1.table2"],
+            "namespace1": ["namespace1.table1", "namespace1.table2", "namespace1.table3"],
         }
         self.namespaces = [["namespace1"]]
 
@@ -40,14 +43,24 @@ class MockLakeView:
         # For simplicity in this mock, return empty (no nested)
         return []
 
-def test_run_for_table():
+table_rules = {
+    'namespace1.table1':["SMALL_FILES", "NO_LOCATION"],
+    'namespace1.table2':["LARGE_FILES"], 
+    'namespace1.table3':["SMALL_FILES", "SMALL_FILES_LARGE_TABLE"]
+}
+
+
+@pytest.mark.parametrize("table", [
+        ('namespace1.table1'), 
+        ('namespace1.table2'), 
+        ('namespace1.table3')
+    ])
+def test_run_for_table(table):
     lakeview = MockLakeView()
     runner = InsightsRunner(lakeview)
-    results = runner.run_for_table("namespace1.table1")
+    results = runner.run_for_table(table)
     codes = {r.code for r in results}
-    assert "SMALL_FILES" in codes
-    assert "NO_LOCATION" in codes
-    assert "LARGE_FILES" not in codes
+    assert set(codes) == set(table_rules[table])
 
 def test_run_for_namespace():
     lakeview = MockLakeView()
@@ -55,14 +68,13 @@ def test_run_for_namespace():
     ns_results = runner.run_for_namespace("namespace1")
     assert "namespace1.table1" in ns_results
     assert "namespace1.table2" in ns_results
+    assert "namespace1.table3" in ns_results
     codes1 = {r.code for r in ns_results["namespace1.table1"]}
     codes2 = {r.code for r in ns_results["namespace1.table2"]}
-    assert "SMALL_FILES" in codes1  # Should trigger for table1 only
-    assert "NO_LOCATION" in codes1
-    assert "LARGE_FILES" not in codes1
-    assert "SMALL_FILES" not in codes2  # Not enough files
-    assert "NO_LOCATION" not in codes2  # Has a location
-    assert "LARGE_FILES" in codes2
+    codes3 = {r.code for r in ns_results["namespace1.table3"]}
+    assert set(codes1) == set(table_rules["namespace1.table1"])
+    assert set(codes2) == set(table_rules["namespace1.table2"])
+    assert set(codes3) == set(table_rules["namespace1.table3"])
 
 def test_run_for_lakehouse():
     lakeview = MockLakeView()
@@ -70,7 +82,10 @@ def test_run_for_lakehouse():
     all_results = runner.run_for_lakehouse()
     assert "namespace1.table1" in all_results
     assert "namespace1.table2" in all_results
-    codes = [r.code for r in all_results["namespace1.table1"]]
-    assert "SMALL_FILES" in codes
-    assert "NO_LOCATION" in codes
-    assert "NO_LOCATION" in codes
+    assert "namespace1.table3" in all_results
+    codes1 = [r.code for r in all_results["namespace1.table1"]]
+    codes2 = [r.code for r in all_results["namespace1.table2"]]
+    codes3 = [r.code for r in all_results["namespace1.table3"]]
+    assert set(codes1) == set(table_rules["namespace1.table1"])
+    assert set(codes2) == set(table_rules["namespace1.table2"])
+    assert set(codes3) == set(table_rules["namespace1.table3"])
