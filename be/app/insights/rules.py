@@ -1,4 +1,5 @@
 from pyiceberg.table import Table
+from pyiceberg.types import StructType, ListType, MapType, UUIDType
 from typing import Optional
 from dataclasses import dataclass
 from app.insights.utils import qualified_table_name
@@ -90,5 +91,54 @@ def rule_small_files_large_table(table: Table) -> Optional[Insight]:
         )
     return None
 
-ALL_RULES = [rule_small_files, rule_no_location, rule_large_files, rule_small_files_large_table]
+def search_for_uuid_column(schema) -> bool:
+    for field in schema.fields:
+        if isinstance(field.field_type, UUIDType):
+            return True
+        # This part handles the nested types
+        # Recurse into nested struct types
+        if isinstance(field.field_type, StructType):
+            if search_for_uuid_column(field.field_type):
+                return True        
+        # Recurse into nested list types
+        elif isinstance(field.field_type, ListType):
+            element_type = field.field_type.element_type
+            if isinstance(element_type, UUIDType):
+                return True
+            if isinstance(element_type, StructType):
+                if search_for_uuid_column(element_type):
+                    return True                
+        # Recurse into nested map types
+        elif isinstance(field.field_type, MapType):
+            key_type = field.field_type.key_type
+            value_type = field.field_type.value_type
+            if isinstance(key_type, UUIDType):
+                return True
+            if isinstance(value_type, UUIDType):
+                return True
+            if isinstance(key_type, StructType):
+                if search_for_uuid_column(key_type):
+                    return True
+            if isinstance(value_type, StructType):
+                if search_for_uuid_column(value_type):
+                    return True
+
+    return False            
+
+def rule_column_uuid_table(table: Table) -> Optional[Insight]:
+    # Access the schema of the table
+    uuid = search_for_uuid_column(table.schema())
+
+    if uuid:
+        meta = INSIGHT_META["UUID_COLUMN"]
+        return Insight(
+            code="UUID_COLUMN",
+            table=qualified_table_name(table.name()),
+            message=meta["message"],
+            severity=meta["severity"],
+            suggested_action=meta["suggested_action"]
+        )
+    return None
+
+ALL_RULES = [rule_small_files, rule_no_location, rule_large_files, rule_small_files_large_table, rule_column_uuid_table]
 

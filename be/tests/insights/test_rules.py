@@ -1,7 +1,16 @@
 from unittest.mock import MagicMock
-from app.insights.rules import rule_small_files, rule_no_location, Insight, ALL_RULES
 from app.insights.runner import InsightsRunner
 import pytest
+from pyiceberg.types import (
+    UUIDType,
+    StructType,
+    ListType,
+    MapType,
+    NestedField,
+    StringType
+)
+from pyiceberg.schema import Schema
+from app.insights.rules import search_for_uuid_column
 
 def make_mock_table(name, file_count=200, file_size=50_000, location=None):
     mock_file = MagicMock()
@@ -89,3 +98,22 @@ def test_run_for_lakehouse():
     assert set(codes1) == set(table_rules["namespace1.table1"])
     assert set(codes2) == set(table_rules["namespace1.table2"])
     assert set(codes3) == set(table_rules["namespace1.table3"])
+
+
+@pytest.mark.parametrize("schema,expected", [
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=UUIDType())), True),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=StringType())), False),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=ListType(element_id=3, element_type=StringType()))), False),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=ListType(element_id=3, element_type=UUIDType()))), True),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=ListType(element_id=3, element_type=StructType(fields=[NestedField(field_id=4, name="field_3",field_type=StringType())])))), False),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=ListType(element_id=3, element_type=StructType(fields=[NestedField(field_id=4, name="field_3",field_type=UUIDType())])))), True),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=StructType(fields=[NestedField(field_id=3, name="field_3",field_type=UUIDType())]))), True),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=StructType(fields=[NestedField(field_id=3, name="field_3",field_type=StringType())]))), False),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=MapType(key_id=3, key_type=StringType(),value_id=4, value_type=StringType()))), False),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=MapType(key_id=3, key_type=StringType(),value_id=4, value_type=UUIDType()))), True),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=MapType(key_id=3, key_type=UUIDType(),value_id=4, value_type=StringType()))), True),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=MapType(key_id=3, key_type=StringType(),value_id=4, value_type=StructType(fields=[NestedField(field_id=3, name="field_3",field_type=StringType())])))), False),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=MapType(key_id=3, key_type=StringType(),value_id=4, value_type=StructType(fields=[NestedField(field_id=3, name="field_3",field_type=UUIDType())])))), True)
+])    
+def test_search_for_uuid_column(schema,expected): 
+    assert search_for_uuid_column(schema) == expected

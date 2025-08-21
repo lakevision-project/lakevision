@@ -6,7 +6,7 @@ from pyiceberg.catalog import load_catalog, Catalog
 from pyiceberg.schema import Schema
 from pyiceberg.types import StringType, LongType, NestedField
 from pyiceberg.table import Table
-from pyiceberg.types import StringType, LongType
+from pyiceberg.types import StringType, LongType, UUIDType
 from pyiceberg.partitioning import PartitionSpec
 import numpy as np
 import random
@@ -161,7 +161,6 @@ def create_large_files_table(catalog: Catalog, namespace: str, table_name: str):
 
     # Use canonical Iceberg location for data files
     table_dir = table.location().replace("file://", "")
-    write_large_parquet_files
     file_paths = write_large_parquet_files(table_dir, n_files=1)
 
     # Register all files with Iceberg metadata!
@@ -169,9 +168,32 @@ def create_large_files_table(catalog: Catalog, namespace: str, table_name: str):
 
     print(f"Created LARGE_FILES table at {table_dir} with {len(file_paths)} large files.")
 
+def create_uuid_column_and_empty_table(catalog: Catalog, namespace: str, table_name: str):
+    table_id = f"{namespace}.{table_name}"
+    # Remove existing table if exists
+    if catalog.table_exists(table_id):
+        catalog.drop_table(table_id)
+    
+    schema = Schema(
+        NestedField(1, "id", LongType(), required=True),
+        NestedField(2, "value", UUIDType(), required=False)
+    )
+    catalog.create_namespace_if_not_exists(namespace)
+    table = catalog.create_table(
+        identifier=table_id,
+        schema=schema
+    )
+
+    # Use canonical Iceberg location for data files
+    table_dir = table.location().replace("file://", "")
+    file_paths =[]
+
+    print(f"Created table with uuid column at {table_dir} with {len(file_paths)} files.")    
+
 if __name__ == "__main__":
     catalog = create_catalog()
     create_small_files_table(catalog, "testns", "smallfiles")
     create_no_location_table(catalog, "testns", "noloc")
     create_large_files_table(catalog, "testns", "largefiles")
+    create_uuid_column_and_empty_table(catalog, "testns", "uuidcolumn")
     print("\nDone! Use these tables for local rule validation/testing.\n")
