@@ -20,7 +20,7 @@ class MockLakeView:
     def __init__(self):
         self.tables = {
             "namespace1.table1": make_mock_table("table1", 200, 50_000, None),
-            "namespace1.table2": make_mock_table("table2", 10, 2_000_000, "some_location"),
+            "namespace1.table2": make_mock_table("table2", 10, 1024**3, "some_location"),
         }
         self.ns_tables = {
             "namespace1": ["namespace1.table1", "namespace1.table2"],
@@ -47,6 +47,7 @@ def test_run_for_table():
     codes = {r.code for r in results}
     assert "SMALL_FILES" in codes
     assert "NO_LOCATION" in codes
+    assert "LARGE_FILES" not in codes
 
 def test_run_for_namespace():
     lakeview = MockLakeView()
@@ -58,8 +59,10 @@ def test_run_for_namespace():
     codes2 = {r.code for r in ns_results["namespace1.table2"]}
     assert "SMALL_FILES" in codes1  # Should trigger for table1 only
     assert "NO_LOCATION" in codes1
+    assert "LARGE_FILES" not in codes1
     assert "SMALL_FILES" not in codes2  # Not enough files
     assert "NO_LOCATION" not in codes2  # Has a location
+    assert "LARGE_FILES" in codes2
 
 def test_run_for_lakehouse():
     lakeview = MockLakeView()
@@ -69,4 +72,5 @@ def test_run_for_lakehouse():
     assert "namespace1.table2" in all_results
     codes = [r.code for r in all_results["namespace1.table1"]]
     assert "SMALL_FILES" in codes
+    assert "NO_LOCATION" in codes
     assert "NO_LOCATION" in codes
