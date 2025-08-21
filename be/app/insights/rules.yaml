@@ -22,3 +22,7 @@ NO_ROWS_TABLE:
   severity: Suggestion
   message: "Table with zero rows (possibly orphaned or unneeded)"
   suggested_action: "Remove or archive unused tables."
+SNAPSHOT_SPRAWL_TABLE:
+  severity: Warning
+  message: "Table with a large number of snapshots: {snapshots} (over {max_snapshots_recommended}) , which may affect table load and metadata performance."
+  suggested_action: "Suggested action: Expire or tag old snapshots to improve performance"

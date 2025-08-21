@@ -190,10 +190,38 @@ def create_uuid_column_and_empty_table(catalog: Catalog, namespace: str, table_n
 
     print(f"Created table with uuid column at {table_dir} with {len(file_paths)} files.")    
 
+
+def create_several_snapshots_table(catalog: Catalog, namespace: str, table_name: str):
+    table_id = f"{namespace}.{table_name}"
+    # Remove existing table if exists
+    if catalog.table_exists(table_id):
+        catalog.drop_table(table_id)
+    
+    schema = Schema(
+        NestedField(1, "id", LongType(), required=True),
+        NestedField(2, "value", StringType(), required=False)
+    )
+    catalog.create_namespace_if_not_exists(namespace)
+    table = catalog.create_table(
+        identifier=table_id,
+        schema=schema
+    )
+
+    # Use canonical Iceberg location for data files
+    table_dir = table.location().replace("file://", "")
+    file_paths = write_parquet_files(table_dir, n_files=1000, rows_per_file=1)
+
+    # Register all files with Iceberg metadata!
+    for file in file_paths:
+        table.add_files([file])
+
+    print(f"Created table with many snapshots at {table_dir} with {len(file_paths)} small files.")
+
 if __name__ == "__main__":
     catalog = create_catalog()
     create_small_files_table(catalog, "testns", "smallfiles")
     create_no_location_table(catalog, "testns", "noloc")
     create_large_files_table(catalog, "testns", "largefiles")
     create_uuid_column_and_empty_table(catalog, "testns", "uuidcolumn")
+    create_several_snapshots_table(catalog, "testns", "manysnapshots")
     print("\nDone! Use these tables for local rule validation/testing.\n")
