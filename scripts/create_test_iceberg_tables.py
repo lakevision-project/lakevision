@@ -212,10 +212,14 @@ def create_several_snapshots_table(catalog: Catalog, namespace: str, table_name:
     file_paths = write_parquet_files(table_dir, n_files=1000, rows_per_file=1)
 
     # Register all files with Iceberg metadata!
+    commits = 0
     for file in file_paths:
         table.add_files([file])
+        commits +=1
+        if commits % 50 == 0:
+            print(f"Current commits: {commits}")
 
-    print(f"Created table with many snapshots at {table_dir} with {len(file_paths)} small files.")
+    print(f"Created table with many snapshots at {table_dir} with {len(file_paths)} small files. Commits: {commits}")
 
 if __name__ == "__main__":
     catalog = create_catalog()
