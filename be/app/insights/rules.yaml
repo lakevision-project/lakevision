@@ -26,3 +26,7 @@ SNAPSHOT_SPRAWL_TABLE:
   severity: Warning
   message: "Table with a large number of snapshots: {snapshots} (over {max_snapshots_recommended}) , which may affect table load and metadata performance."
   suggested_action: "Suggested action: Expire or tag old snapshots to improve performance"
+SKEWED_OR_LARGEST_PARTITIONS_TABLE:
+  severity: Info
+  message: "Partitions much larger or smaller than others, or any very large partitions. Partitions: {partitions}. Skew ratio: {skew_ratio}. Bytes size -> median: {median_size}, skewed: {skewed_size}. Records -> median: {median_records}, skewed:{skewed_records})"
+  suggested_action: "Review partitioning strategy; consider rebalancing data"

@@ -11,6 +11,7 @@ from pyiceberg.types import (
 )
 from pyiceberg.schema import Schema
 from app.insights.rules import search_for_uuid_column
+from pyiceberg.partitioning import PartitionSpec
 
 def make_mock_table(name, file_count=200, file_size=50_000, location=None, schema=Schema(NestedField(field_id=1, name="field_1", field_type=StringType())), snapshots = 5):
     mock_file = MagicMock()
@@ -25,6 +26,9 @@ def make_mock_table(name, file_count=200, file_size=50_000, location=None, schem
     mock_table.location = location
     mock_table.schema.return_value = schema
     mock_table.history.return_value = [j for j in range(snapshots)]
+    spec_mock = MagicMock()
+    spec_mock.fields = None
+    mock_table.spec.return_value = spec_mock
 
     # Set a current_snapshot_id to simulate a non-empty table
     mock_table.metadata.current_snapshot_id = None if file_count == 0 else 12345

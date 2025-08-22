@@ -1,4 +1,4 @@
-from pyiceberg.table import Table
+from pyiceberg.table import Table 
 from pyiceberg.types import StructType, ListType, MapType, UUIDType
 from typing import Optional
 from dataclasses import dataclass
@@ -6,6 +6,9 @@ from app.insights.utils import qualified_table_name
 import yaml
 import os
 import pyarrow.compute as pc
+from .common import TableFile
+from collections import defaultdict
+from statistics import median
 
 rules_yaml_path = os.path.join(os.path.dirname(__file__), "rules.yaml")
 
@@ -15,6 +18,7 @@ ONE_GB_IN_BYTES = 1000**3  # 1 GB in bytes (1024**3 is the actual value)
 LARGE_TABLE_IN_BYTES= 50 * ONE_GB_IN_BYTES
 AVERAGE_SMALL_FILES_LARGE_TABLES_IN_BYTES = 50_000
 MAX_SNAPSHOTS_RECOMMENDED = 500
+SKEWED_PARTITION_THRESHOLD_RATIO = 10 
 
 # Load yaml at app startup
 with open(rules_yaml_path) as f:
@@ -27,6 +31,8 @@ class Insight:
     message: str
     severity: str
     suggested_action: str
+
+
 
 def rule_small_files(table: Table) -> Optional[Insight]:
     files = [file_scan_task.file.file_size_in_bytes for file_scan_task in table.scan().plan_files()]
@@ -144,7 +150,6 @@ def rule_column_uuid_table(table: Table) -> Optional[Insight]:
 
 def rule_no_rows_table(table: Table) -> Optional[Insight]:
     empty: bool = False
-    print(f"rule_no_rows_table: {table.name()}")
     if table.metadata.current_snapshot_id:
         paTable = table.inspect.snapshots().sort_by([('committed_at', 'descending')]).select(['summary', 'committed_at'])          
         result = dict(paTable.to_pydict()['summary'][0])
@@ -186,6 +191,71 @@ def rule_too_many_snapshot_table(table: Table) -> Optional[Insight]:
     return None
 
 
+# Optional: compute Gini for rows
+def gini(xs):
+    if not xs: return 0.0
+    xs = sorted(xs)
+    n = len(xs)
+    s = sum(xs)
+    if s == 0: return 0.0
+    cum = 0
+    for i, x in enumerate(xs, 1):
+        cum += i * x
+    return (2*cum)/(n*s) - (n+1)/n
+
+def rule_skewed_or_largest_partitions_table(table: Table) -> Optional[Insight]:
+    partition_spec = table.spec()
+    
+    # Table has partitions
+    if partition_spec.fields:
+        try:
+            files = [TableFile.from_task(task) for task in table.scan().plan_files()]
+            partition_summary = defaultdict(lambda: {"records": 0, "size_bytes": 0})
+            for file in files:
+                # Create a unique, sortable key for the partition
+                # Ensure the partition filters are sorted consistently
+                partition_key = tuple(sorted([(col.name, col.value) for col in file.partition]))
+                
+                # Aggregate records and size_bytes
+                partition_summary[partition_key]["records"] += file.records
+                partition_summary[partition_key]["size_bytes"] += file.size_bytes
+
+            partition_list = []
+            for partition_key, summary_values in partition_summary.items():
+                partition_list.append({
+                    "partition_key": partition_key,
+                    "records": summary_values["records"],
+                    "size_bytes": summary_values["size_bytes"]
+                })
+
+            partitions_size = len(partition_summary)
+            records_by_partition = [v["records"] for v in partition_summary.values()]
+            size_by_partition = [v["size_bytes"] for v in partition_summary.values()]
+            median_records = median(records_by_partition)
+            median_size = median(size_by_partition)
+            # Condition that checks for a significant positive skew in the data. It evaluates to True if the largest value in your dataset is more than X times greater than the median value.
+            skewed_records = max(records_by_partition)/median_records > SKEWED_PARTITION_THRESHOLD_RATIO
+            skewed_size = max(size_by_partition)/median_size > SKEWED_PARTITION_THRESHOLD_RATIO
+      
+            meta = INSIGHT_META["SKEWED_OR_LARGEST_PARTITIONS_TABLE"]
+            if skewed_records or skewed_size:
+                return Insight(
+                    code="SKEWED_OR_LARGEST_PARTITIONS_TABLE",
+                    table=qualified_table_name(table.name()),
+                    message=meta["message"].format(partitions=int(partitions_size), skew_ratio=int(SKEWED_PARTITION_THRESHOLD_RATIO), 
+                                                median_size=int(median_size), skewed_size=str(skewed_size),
+                                                median_records=int(median_records), skewed_records=str(skewed_records)),
+                    severity=meta["severity"],
+                    suggested_action=meta["suggested_action"]
+                )
+
+        except Exception as e:
+            print(str(e))
+            raise Exception(f"There was a problem with your request: {e}") from e
+        
+    return None
+
+
 ALL_RULES = [
     rule_small_files, 
     rule_no_location, 
@@ -193,6 +263,7 @@ ALL_RULES = [
     rule_small_files_large_table, 
     rule_column_uuid_table, 
     rule_no_rows_table,
-    rule_too_many_snapshot_table
+    rule_too_many_snapshot_table,
+    rule_skewed_or_largest_partitions_table
 ]
 
