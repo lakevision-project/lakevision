@@ -28,5 +28,5 @@ SNAPSHOT_SPRAWL_TABLE:
   suggested_action: "Suggested action: Expire or tag old snapshots to improve performance"
 SKEWED_OR_LARGEST_PARTITIONS_TABLE:
   severity: Info
-  message: "Partitions much larger or smaller than others, or any very large partitions. Partitions: {partitions}. Skew ratio: {skew_ratio}. Bytes size -> median: {median_size}, skewed: {skewed_size}. Records -> median: {median_records}, skewed:{skewed_records})"
+  message: "This table has {partitions} partitions. The largest partition is much bigger than the typical one. Median partition size: {median_size} bytes, largest partition: {largest_size} bytes. Median records: {median_records}, largest partition: {largest_records} records."
   suggested_action: "Review partitioning strategy; consider rebalancing data"

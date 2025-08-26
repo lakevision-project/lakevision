@@ -11,7 +11,8 @@ from pyiceberg.types import (
 )
 from pyiceberg.schema import Schema
 from app.insights.rules import search_for_uuid_column
-from pyiceberg.partitioning import PartitionSpec
+from pyiceberg.typedef import Record
+from types import SimpleNamespace
 
 def make_mock_table(name, file_count=200, file_size=50_000, location=None, schema=Schema(NestedField(field_id=1, name="field_1", field_type=StringType())), snapshots = 5):
     mock_file = MagicMock()
@@ -43,7 +44,55 @@ def make_mock_table(name, file_count=200, file_size=50_000, location=None, schem
 
     return mock_table
     
+def make_task(path, fmt, records, size, partition_dict):
+    partition = SimpleNamespace(**partition_dict)
+    file = SimpleNamespace(
+        file_path=path,
+        file_format=fmt,
+        record_count=records,
+        file_size_in_bytes=size,
+        partition=partition,
+    )
+    return SimpleNamespace(file=file)
 
+def make_mock_partitioned_table(name, location = None):
+    mock_table = MagicMock()
+    
+    # Mock a partitioned table with fields
+    mock_partition_spec = MagicMock()
+    mock_partition_spec.fields = [MagicMock()] # non-empty list to pass the if-condition
+    mock_table.spec.return_value = mock_partition_spec
+
+    skewed_tasks = [
+        make_task("f1", "parquet", 10, 100, {"category": "A"}),
+        make_task("f2", "parquet", 100000, 1, {"category": "B"}), 
+        make_task("f3", "parquet", 1, 10000, {"category": "C"}), 
+    ]
+
+    # Mock the scan plan to return the tasks
+    mock_scan_plan = MagicMock()
+    mock_scan_plan.plan_files.return_value = skewed_tasks
+    mock_table.scan.return_value = mock_scan_plan
+    
+    mock_table.name.return_value = name
+    mock_table.location = location
+
+    # Set a current_snapshot_id to simulate a non-empty table
+    mock_table.metadata.current_snapshot_id =  12345
+    # Define the return value for the inspect.snapshots() method when not empty
+    mock_pa_table = MagicMock()
+    mock_pa_table.to_pydict.return_value = {
+        'summary': [{'total-records': 1210}],
+        'committed_at': [1678886400]
+    }
+    # Chain the mock methods: inspect.snapshots().sort_by().select()
+    mock_table.inspect.snapshots.return_value.sort_by.return_value.select.return_value = mock_pa_table
+
+    spec_mock = MagicMock()
+    spec_mock.fields = ("category",)
+    mock_table.spec.return_value = spec_mock
+
+    return mock_table
 
 class MockLakeView:
     def __init__(self):
@@ -53,9 +102,10 @@ class MockLakeView:
             "namespace1.table3": make_mock_table(name="table3", file_count=1_200_000, file_size=49_000, location="some_location"),
             "namespace1.table4": make_mock_table(name="table4", file_count=0, file_size=0, location="some_location"),
             "namespace1.table5": make_mock_table(name="table5", file_count=1000, file_size=1, location="some_location", snapshots=1000),
+            "namespace1.table6": make_mock_partitioned_table(name="table6", location="some_location"),
         }
         self.ns_tables = {
-            "namespace1": ["namespace1.table1", "namespace1.table2", "namespace1.table3", "namespace1.table4", "namespace1.table5"],
+            "namespace1": ["namespace1.table1", "namespace1.table2", "namespace1.table3", "namespace1.table4", "namespace1.table5", "namespace1.table6"],
         }
         self.namespaces = [["namespace1"]]
 
@@ -77,7 +127,8 @@ table_rules = {
     'namespace1.table2':["LARGE_FILES", "UUID_COLUMN"], 
     'namespace1.table3':["SMALL_FILES", "SMALL_FILES_LARGE_TABLE"],
     'namespace1.table4':["NO_ROWS_TABLE"],
-    'namespace1.table5':["SMALL_FILES","SNAPSHOT_SPRAWL_TABLE"]
+    'namespace1.table5':["SMALL_FILES","SNAPSHOT_SPRAWL_TABLE"],
+    'namespace1.table6':["SKEWED_OR_LARGEST_PARTITIONS_TABLE"]
 }
 
 
@@ -86,7 +137,8 @@ table_rules = {
         ('namespace1.table2'), 
         ('namespace1.table3'),
         ('namespace1.table4'),
-        ('namespace1.table5')
+        ('namespace1.table5'),
+        ('namespace1.table6')
     ])
 def test_run_for_table(table):
     lakeview = MockLakeView()

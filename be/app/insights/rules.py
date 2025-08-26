@@ -236,6 +236,9 @@ def rule_skewed_or_largest_partitions_table(table: Table) -> Optional[Insight]:
             # Condition that checks for a significant positive skew in the data. It evaluates to True if the largest value in your dataset is more than X times greater than the median value.
             skewed_records = max(records_by_partition)/median_records > SKEWED_PARTITION_THRESHOLD_RATIO
             skewed_size = max(size_by_partition)/median_size > SKEWED_PARTITION_THRESHOLD_RATIO
+
+            largest_records = max(records_by_partition)
+            largest_size = max(size_by_partition)
       
             meta = INSIGHT_META["SKEWED_OR_LARGEST_PARTITIONS_TABLE"]
             if skewed_records or skewed_size:
@@ -243,8 +246,8 @@ def rule_skewed_or_largest_partitions_table(table: Table) -> Optional[Insight]:
                     code="SKEWED_OR_LARGEST_PARTITIONS_TABLE",
                     table=qualified_table_name(table.name()),
                     message=meta["message"].format(partitions=int(partitions_size), skew_ratio=int(SKEWED_PARTITION_THRESHOLD_RATIO), 
-                                                median_size=int(median_size), skewed_size=str(skewed_size),
-                                                median_records=int(median_records), skewed_records=str(skewed_records)),
+                                                median_size=int(median_size), largest_size=str(largest_size),
+                                                median_records=int(median_records), largest_records=str(largest_records)),
                     severity=meta["severity"],
                     suggested_action=meta["suggested_action"]
                 )
