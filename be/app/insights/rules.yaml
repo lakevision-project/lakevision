@@ -10,3 +10,23 @@ UUID_COLUMN:
   severity: Info
   message: "Table uses UUID columns, which may be incompatible with some engines."
   suggested_action: "Consider using a different column type."
+LARGE_FILES:
+  severity: Warning
+  message: "Table has large data files/s: {num_files} files, average size {avg_size} bytes. {num_large_files} file/s >= {max_size} bytes."
+  suggested_action: "Rewrite table to split large files into smaller chunks."
+SMALL_FILES_LARGE_TABLE:
+  severity: Warning
+  message: "Table with {avg_size} bytes average size and total size {total_size}."
+  suggested_action: "Rewrite table to merge small files and improve efficiency"
+NO_ROWS_TABLE:
+  severity: Suggestion
+  message: "Table with zero rows (possibly orphaned or unneeded)"
+  suggested_action: "Remove or archive unused tables."
+SNAPSHOT_SPRAWL_TABLE:
+  severity: Warning
+  message: "Table with a large number of snapshots: {snapshots} (over {max_snapshots_recommended}) , which may affect table load and metadata performance."
+  suggested_action: "Suggested action: Expire or tag old snapshots to improve performance"
+SKEWED_OR_LARGEST_PARTITIONS_TABLE:
+  severity: Info
+  message: "This table has {partitions} partitions. The largest partition is much bigger than the typical one. Median partition size: {median_size} bytes, largest partition: {largest_size} bytes. Median records: {median_records}, largest partition: {largest_records} records."
+  suggested_action: "Review partitioning strategy; consider rebalancing data"
