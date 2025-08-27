@@ -4,3 +4,6 @@ dev/warehouse
 be/app/__pycache__
 be/.venv/
 be/warehouse/
+
+__pycache__/
+*.pyc
