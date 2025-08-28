@@ -13,3 +13,5 @@ authlib
 itsdangerous
 humanize
 sqlglot
+sqlalchemy
+duckdb>=0.9.2
