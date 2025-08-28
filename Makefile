@@ -38,7 +38,8 @@ CHECK_VENV = \
 
 .PHONY: init-be
 init-be:
-	cd be && python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+	cd be && python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt -r requirements-dev.txt
+
 
 .PHONY: run-be
 run-be:
@@ -49,8 +50,14 @@ run-be:
 clean-be:
 	rm -rf be/.venv
 
+.PHONY: sample-catalog-deps
+sample-catalog-deps:
+	$(CHECK_VENV)
+	@echo "📚 Ensuring SQLite extras for PyIceberg are available (sample only)..."
+	@cd be && ../$(VENV_PYTHON) -m pip install "pyiceberg[sql-sqlite]"
+
 .PHONY: sample-catalog
-sample-catalog:
+sample-catalog: sample-catalog-deps
 	$(CHECK_VENV)
 	@echo "📦 Creating sample in-memory Iceberg catalog with demo data..."
 	cd be && set -a && source ../.env && set +a && PYTHONPATH=app ../$(VENV_PYTHON) ../scripts/load_sample_data.py
@@ -60,9 +67,26 @@ clean-catalog:
 	@echo "🧹 Removing sample catalog and warehouse files..."
 	rm -rf be/warehouse/
 
+.PHONY: test-be
+test-be:
+	$(CHECK_VENV)
+	cd be && PYTHONPATH=app ../$(VENV_PYTHON) -m pytest tests
+
 # --- Frontend ---
 
-init-fe:
+.PHONY: check-npm
+check-npm:
+	@command -v npm >/dev/null 2>&1 || { \
+		echo "❌ npm is required but not installed."; \
+		echo ""; \
+		echo "Install Node.js (which includes npm):"; \
+		echo "  macOS:   brew install node"; \
+		echo "  Ubuntu:  sudo apt-get update && sudo apt-get install -y nodejs npm"; \
+		echo "  Fedora:  sudo dnf install -y nodejs npm"; \
+		echo "  Windows: Download from https://nodejs.org/"; \
+		exit 1; }
+
+init-fe: check-npm
 	cd fe && npm install
 
 prepare-fe-env:
