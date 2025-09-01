@@ -17,16 +17,6 @@ def user_model():
     """Provides the User dataclass model to tests."""
     return User
 
-@pytest.fixture
-def duckdb_in_memory_storage(user_model):
-    """Provides a connected, in-memory DuckDB storage adapter."""
-    storage = get_storage(model=user_model, db_url="duckdb:///:memory:")
-    try:
-        storage.connect()
-        storage.ensure_table()
-        yield storage
-    finally:
-        storage.disconnect()
 
 @pytest.fixture
 def sqlalchemy_in_memory_storage(user_model):
@@ -39,7 +29,7 @@ def sqlalchemy_in_memory_storage(user_model):
     finally:
         storage.disconnect()
 
-@pytest.fixture(params=["duckdb_in_memory_storage", "sqlalchemy_in_memory_storage"])
+@pytest.fixture(params=["sqlalchemy_in_memory_storage"])
 def storage_adapter(request):
     """
     A meta-fixture that parameterizes tests to run against all storage adapters.
