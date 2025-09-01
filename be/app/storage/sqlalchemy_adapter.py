@@ -29,6 +29,7 @@ class SQLAlchemyStorage(StorageInterface[T]):
     def disconnect(self) -> None:
         if self._engine:
             self._engine.dispose()
+            self._engine = None
 
     def _get_engine(self) -> Engine:
         if not self._engine:
@@ -132,7 +133,6 @@ class SQLAlchemyStorage(StorageInterface[T]):
 
     def delete(self, item_id: Any) -> None:
         engine = self._get_engine()
-        with engine.connect() as conn:
+        with engine.begin() as conn:
             stmt = text(f"DELETE FROM {self.table_name} WHERE id = :id")
             conn.execute(stmt, {"id": item_id})
-            conn.commit()
