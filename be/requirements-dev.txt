@@ -2,3 +2,4 @@ pytest
 pandas
 numpy
 pyiceberg[sql-postgres]
+pytest-mock
