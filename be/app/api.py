@@ -8,13 +8,20 @@ from starlette.responses import JSONResponse
 from lakeviewer import LakeView
 from app.insights.runner import InsightsRunner
 from fastapi import Query
-from typing import Generator
+from typing import Generator, Any
 from pyiceberg.table import Table
 import time, os, requests
 from threading import Timer
 from pydantic import BaseModel
 import importlib
 import logging
+import json
+import numpy as np
+import math
+import decimal
+import datetime as dt
+import uuid
+import pandas as pd
 
 AUTH_ENABLED        = True if os.getenv("PUBLIC_AUTH_ENABLED", '')=='true' else False
 CLIENT_ID           = os.getenv("PUBLIC_OPENID_CLIENT_ID", '')
@@ -27,6 +34,58 @@ SECRET_KEY          = os.getenv("SECRET_KEY", "@#dsfdds1112")
 AUTHZ_MODULE = os.getenv("AUTHZ_MODULE_NAME") or "authz"
 AUTHZ_CLASS  = os.getenv("AUTHZ_CLASS_NAME") or "Authz"
 
+def _clean_data_recursively(x: Any) -> Any:
+    """
+    Recursively traverses a data structure to replace special types and values
+    that are not JSON serializable.
+    """
+    if isinstance(x, bytes):
+            return '__binary_data__'
+    if isinstance(x, (list, tuple, set)):
+        return [_clean_data_recursively(v) for v in x]
+    if isinstance(x, dict):
+        return {k: _clean_data_recursively(v) for k, v in x.items()}
+
+    # Handle numpy types
+    if isinstance(x, np.integer):
+        return int(x)
+    if isinstance(x, np.floating):
+        return None if (np.isnan(x) or np.isinf(x)) else float(x)
+    if isinstance(x, np.ndarray):
+        return x.tolist()
+
+    # Handle standard float
+    if isinstance(x, float):
+        return None if (math.isnan(x) or math.isinf(x)) else x
+
+    # Handle other common types
+    if isinstance(x, (decimal.Decimal)):
+        return float(x)
+    if isinstance(x, (dt.datetime, dt.date, pd.Timestamp)):
+        return x.isoformat()
+    if isinstance(x, uuid.UUID):
+        return str(x)
+
+    return x
+
+# --- The Corrected Generic Response Class ---
+
+class CleanJSONResponse(JSONResponse):
+    def render(self, content: Any) -> bytes:
+        """
+        Renders content to JSON. It assumes content is a standard Python collection
+        and runs a final cleaning pass to ensure all nested values are serializable.
+        """
+        # The content should no longer be a DataFrame here. We run the recursive
+        # cleaner as a robust final step for any content returned by endpoints.
+        payload = _clean_data_recursively(content)
+        return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+
+# --- Simplified FastAPI Application ---
+
+app = FastAPI(default_response_class=CleanJSONResponse)
+
 class LVException(Exception):
     def __init__(self, name: str, message: str):
         self.name = name
@@ -37,7 +96,6 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
 )
 
-app = FastAPI()
 lv = LakeView()
 
 authz_module = importlib.import_module(AUTHZ_MODULE)
@@ -112,7 +170,7 @@ def get_table(request: Request, table_id: str):
 def check_auth(request: Request):
     user = request.session.get("user")
     if user:
-        return JSONResponse(user)
+        return user
     return None
 
 @app.get("/api/namespaces")
@@ -229,7 +287,7 @@ def get_token(request: Request, tokenReq: TokenRequest):
     r2 = requests.get(f"{OPENID_PROVIDER_URL}/userinfo?access_token={response.json()['access_token']}")
     user_email = r2.json()['email'] 
     request.session['user'] = user_email
-    return JSONResponse(user_email)  
+    return user_email
 
 @app.get("/api/logout")
 def logout(request: Request):

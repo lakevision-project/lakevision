@@ -130,7 +130,7 @@
             const statusCode = res.status;
             if (res.ok) {
                 const data = await res.json();                  
-                return JSON.parse(data);                
+                return data;                
             }
             else if (statusCode == 403){
                 console.log("No Access");

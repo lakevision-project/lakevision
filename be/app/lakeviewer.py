@@ -77,8 +77,7 @@ class LakeView():
         pa_partitions = table.inspect.partitions()        
         if pa_partitions.num_rows >1:
             pa_partitions = pa_partitions.sort_by([('partition', 'ascending')])
-        cols = self.paTable_to_dataTable(pa_partitions)
-        return cols
+        return pa_partitions.to_pandas().to_dict(orient='records')
 
     def get_snapshot_data(self, table):        
         if not table.metadata.current_snapshot_id:
@@ -87,8 +86,7 @@ class LakeView():
         df = pa_snaps.to_pandas()
         df['committed_at'] = df['committed_at'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
         df['id'] = df.index
-        cols = df.to_json(orient='records')
-        return cols
+        return df.to_dict(orient='records')
     
     def get_data_change(self, table):        
         #table = self.catalog.load_table(table_id)
@@ -98,8 +96,7 @@ class LakeView():
         df['committed_at'] = df['committed_at'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))              
         df_summ = pd.DataFrame(df['summary'].apply(self.flatten_tuples).tolist())
         df_flattened = pd.concat([df.drop('summary', axis=1), df_summ], axis=1)        
-        cols = df_flattened.to_json(orient='records', default_handler = BinaryEncoder)                
-        return cols
+        return df_flattened.to_dict(orient='records')                
 
     def get_sample_data(self, table, sql, limit=50):
         df = daft.read_iceberg(table)         
@@ -131,10 +128,10 @@ class LakeView():
                         f"Number of scan tasks ({num_tasks}) too high. Optimize the query or use a distributed query tool."
                     )            
         else:        
-            df = df.limit(limit)            
-        paT = df.to_arrow()   
-        paT = self.convertTimestamp(paT)     
-        return self.paTable_to_dataTable(paT)         
+            df = df.limit(limit)
+        paT = df.to_arrow()
+        paT = self.convertTimestamp(paT)
+        return paT.to_pandas().to_dict(orient='records')
        
 
     def get_schema(self, table):
@@ -143,8 +140,7 @@ class LakeView():
         for field in table.schema().fields:
             df2 = pd.DataFrame([[str(field.field_id), str(field.name), str(field.field_type), str(field.required), field.doc]], columns=["Field_id", "Field", "DataType", "Required", "Comments"])
             df = pd.concat([df, df2])
-        pa_table = pa.Table.from_pandas(df)
-        return self.paTable_to_dataTable(pa_table)
+        return df.to_dict(orient='records')
     
     def get_summary(self, table):
         #table = self.catalog.load_table(table_id)
@@ -176,23 +172,23 @@ class LakeView():
         ret['Identifier fields'] = ''
         if len(table.schema().identifier_field_names()) > 0:
                 ret['Identifier fields'] = list(table.schema().identifier_field_names())
-        return json.dumps(ret)
+        return ret
 
     def get_properties(self, table):
         #table = self.catalog.load_table(table_id)
-        return json.dumps(table.properties)         
+        return table.properties
         
     def get_partition_specs(self, table):
         #table = self.catalog.load_table(table_id)
         partitionfields=table.spec().fields
-        c1, c2, c3 = [], [], []
+        result = []
         for f in partitionfields:
-            c1.append(table.schema().find_column_name(f.source_id))
-            c2.append(f.name)
-            c3.append(str(f.transform))
-        df = pd.DataFrame({"Field": c1, "Name": c2, "Transform": c3})
-        pa_table = pa.Table.from_pandas(df)
-        return self.paTable_to_dataTable(paTable=pa_table)
+            result.append({
+                "Field": table.schema().find_column_name(f.source_id), 
+                "Name": f.name, 
+                "Transform": str(f.transform)
+                })
+        return result
     
     def get_sort_order(self, table):
         sorts = []
@@ -203,7 +199,7 @@ class LakeView():
             ret["Direction"] = fld.direction.name
             ret["Null Order"] = fld.null_order.name
             sorts.append(ret)
-        return json.dumps(sorts)
+        return sorts
 
     def get_row_filter(self, partition, table):
         if partition is None or len(partition) == 0:
@@ -225,14 +221,6 @@ class LakeView():
                     expression += f" and {key}=='{value}'"
             idx += 1
         return expression if len(expression) > 0 else AlwaysTrue()
-    
-    def paTable_to_dataTable(self, paTable, encoder=None):
-        if encoder:
-            data = json.dumps(paTable.to_pandas().to_dict(orient='records'), cls = BinaryEncoder)
-            return data
-        else:            
-            data = paTable.to_pandas().to_json(orient='records', default_handler = BinaryEncoder)
-            return data
         
     # Flattening the tuple array into separate columns
     def flatten_tuples(self, row):    
@@ -269,11 +257,3 @@ def get_gcp_access_token(service_account_file, scopes):
     request = Request()
     credentials.refresh(request)  # Forces token refresh if needed
     return credentials
-
-class BinaryEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, bytes):
-            return '__binary_data__'
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
