@@ -51,6 +51,8 @@ def _clean_data_recursively(x: Any) -> Any:
         return int(x)
     if isinstance(x, np.floating):
         return None if (np.isnan(x) or np.isinf(x)) else float(x)
+    if isinstance(x, np.bool_):
+        return bool(x)
     if isinstance(x, np.ndarray):
         return x.tolist()
 
@@ -68,7 +70,16 @@ def _clean_data_recursively(x: Any) -> Any:
 
     return x
 
-# --- The Corrected Generic Response Class ---
+def _df_to_records(df: pd.DataFrame) -> list[dict]:
+    """
+    Converts a DataFrame to a list of records, then cleans the data for JSON serialization.
+    """
+    # Convert to dicts first. This preserves nested structures like arrays in cells.
+    records = df.to_dict(orient="records")
+
+    # Recursively clean the entire structure. This is the robust way to handle
+    # all nested types and values like NaN, Inf, np.int64, etc.
+    return _clean_data_recursively(records)
 
 class CleanJSONResponse(JSONResponse):
     def render(self, content: Any) -> bytes:
@@ -193,13 +204,13 @@ def read_table_special_properties(table_id: str):
 
 @app.get("/api/tables/{table_id}/snapshots")
 def read_table_snapshots(table: Table = Depends(get_table)):
-    return lv.get_snapshot_data(table)
+    return _df_to_records(lv.get_snapshot_data(table))
 
 @app.get("/api/tables/{table_id}/partitions", status_code=status.HTTP_200_OK)
 def read_table_partitions(request: Request, response: Response, table_id: str, table: Table = Depends(get_table)):
     if not authz_.has_access(request, response, table_id):        
         return
-    return lv.get_partition_data(table)
+    return _df_to_records(lv.get_partition_data(table))
 
 
 @app.get("/api/tables/{table_id}/sample", status_code=status.HTTP_200_OK)    
@@ -208,14 +219,14 @@ def read_sample_data(request: Request, response: Response, table_id: str, sql = 
         return
     try:    
         res =  lv.get_sample_data(table, sql, sample_limit)
-        return res
+        return _df_to_records(res)
     except Exception as e:
         logging.error(str(e))
         raise LVException("err", str(e))
 
 @app.get("/api/tables/{table_id}/schema")    
 def read_schema_data(table: Table = Depends(get_table)):
-    return lv.get_schema(table)
+    return _df_to_records(lv.get_schema(table))
 
 @app.get("/api/tables/{table_id}/summary")    
 def read_summary_data(table: Table = Depends(get_table)):
@@ -235,7 +246,7 @@ def read_sort_order(table: Table = Depends(get_table)):
 
 @app.get("/api/tables/{table_id}/data-change")    
 def read_data_change(table: Table = Depends(get_table)):
-    return lv.get_data_change(table)
+    return _df_to_records(lv.get_data_change(table))
 
 @app.get("/")
 def root(request: Request):

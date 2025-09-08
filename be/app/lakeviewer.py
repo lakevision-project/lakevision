@@ -77,7 +77,7 @@ class LakeView():
         pa_partitions = table.inspect.partitions()        
         if pa_partitions.num_rows >1:
             pa_partitions = pa_partitions.sort_by([('partition', 'ascending')])
-        return pa_partitions.to_pandas().to_dict(orient='records')
+        return pa_partitions.to_pandas()
 
     def get_snapshot_data(self, table):        
         if not table.metadata.current_snapshot_id:
@@ -86,7 +86,7 @@ class LakeView():
         df = pa_snaps.to_pandas()
         df['committed_at'] = df['committed_at'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
         df['id'] = df.index
-        return df.to_dict(orient='records')
+        return df
     
     def get_data_change(self, table):        
         #table = self.catalog.load_table(table_id)
@@ -96,7 +96,7 @@ class LakeView():
         df['committed_at'] = df['committed_at'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))              
         df_summ = pd.DataFrame(df['summary'].apply(self.flatten_tuples).tolist())
         df_flattened = pd.concat([df.drop('summary', axis=1), df_summ], axis=1)        
-        return df_flattened.to_dict(orient='records')                
+        return df_flattened                
 
     def get_sample_data(self, table, sql, limit=50):
         df = daft.read_iceberg(table)         
@@ -131,7 +131,7 @@ class LakeView():
             df = df.limit(limit)
         paT = df.to_arrow()
         paT = self.convertTimestamp(paT)
-        return paT.to_pandas().to_dict(orient='records')
+        return paT.to_pandas()
        
 
     def get_schema(self, table):
@@ -140,7 +140,7 @@ class LakeView():
         for field in table.schema().fields:
             df2 = pd.DataFrame([[str(field.field_id), str(field.name), str(field.field_type), str(field.required), field.doc]], columns=["Field_id", "Field", "DataType", "Required", "Comments"])
             df = pd.concat([df, df2])
-        return df.to_dict(orient='records')
+        return df
     
     def get_summary(self, table):
         #table = self.catalog.load_table(table_id)
