@@ -185,6 +185,8 @@ def root(request: Request):
         user = check_auth(request)
         if not user:
             return {"message": "You are not logged in."}
+        else:
+            return {"message": f"You are logged in as {user}"}
     return "Hello, no auth enabled"
        
 @app.get("/api/tables")
