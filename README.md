@@ -170,7 +170,7 @@ npm install
 npm run dev -- --port 8081
 ```
 
-### 🔧 Manual Setup with https and Authz (for advanced use)
+### 🔧 Manual Setup with Authz (for advanced use)
 
 #### 1. Implement your Authz class 
 Implement your custom implementation module in the backend, must follow app/be/authz.py
@@ -185,13 +185,15 @@ Configure the following properties in your environment.
 - PUBLIC_OPENID_CLIENT_ID=
 - OPEN_ID_CLIENT_SECRET=
 - PUBLIC_OPENID_PROVIDER_URL=
-- PUBLIC_REDIRECT_URI=https://localhost:8081 #E.g. for local usage
+- PUBLIC_REDIRECT_URI=http://localhost:8081 #E.g. for local usage (or https://localhost:8081)
 - AUTHZ_MODULE_NAME=my_authz
 - AUTHZ_CLASS_NAME=MyAuthz
 
 and run the be. E.g. `make run-be`
 
-#### 3. Run your Sveltekit localhost server with HTTPS
+#### 3. Run your Sveltekit localhost server with HTTPS (optional)
+In case you need to run the frontend with https you can follow this simple steps:
+
 - Install a compatible plugin-basic-ssl to the vite version in the fe.
     
     Add `"@vitejs/plugin-basic-ssl": "^1.2.0"` under devDependency in the package.json and install dependencies. Refers to: Running Locally section.
