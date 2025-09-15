@@ -5,7 +5,7 @@ from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import JSONResponse
-from lakeviewer import LakeView
+from app.lakeviewer import LakeView
 from app.insights.runner import InsightsRunner
 from fastapi import Query
 from typing import Generator
@@ -26,6 +26,11 @@ SECRET_KEY          = os.getenv("SECRET_KEY", "@#dsfdds1112")
 
 AUTHZ_MODULE = os.getenv("AUTHZ_MODULE_NAME") or "authz"
 AUTHZ_CLASS  = os.getenv("AUTHZ_CLASS_NAME") or "Authz"
+
+# Auto-prefix with current package if user passes a bare name like "authz"
+if "." not in AUTHZ_MODULE:
+    pkg = __package__ or "app"  # when running as app.api
+    AUTHZ_MODULE = f"{pkg.rsplit('.', 1)[0]}.{AUTHZ_MODULE}" if "." in pkg else f"{pkg}.{AUTHZ_MODULE}"
 
 class LVException(Exception):
     def __init__(self, name: str, message: str):
