@@ -29,8 +29,8 @@ AUTHZ_CLASS  = os.getenv("AUTHZ_CLASS_NAME") or "Authz"
 
 # Auto-prefix with current package if user passes a bare name like "authz"
 if "." not in AUTHZ_MODULE:
-    pkg = __package__ or "app"  # when running as app.api
-    AUTHZ_MODULE = f"{pkg.rsplit('.', 1)[0]}.{AUTHZ_MODULE}" if "." in pkg else f"{pkg}.{AUTHZ_MODULE}"
+    # assummes the authz module is under app package/folder
+    AUTHZ_MODULE = f"app.{AUTHZ_MODULE}"
 
 class LVException(Exception):
     def __init__(self, name: str, message: str):
