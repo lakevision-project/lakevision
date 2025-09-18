@@ -138,7 +138,7 @@
                 access_allowed = false;
                 return error
             }else if (res.status === 401) {
-                goto("/api/login?namespace="+namespace+"&table="+table+"&sample_limit=${$sample_limit}");
+                goto("/api/login?namespace="+namespace+"&table="+table+"&sample_limit="+$sample_limit);
 			}
             else{
                 console.error("Failed to fetch data:", res.statusText);
@@ -269,7 +269,7 @@
 
     function set_copy_url(){
         url = window.location.origin;
-        url = url+"/?namespace="+namespace+"&table="+table+"&sample_limit=${$sample_limit}";
+        url = url+"/?namespace="+namespace+"&table="+table+"&sample_limit="+$sample_limit;
     }
 
     function reset(table){
