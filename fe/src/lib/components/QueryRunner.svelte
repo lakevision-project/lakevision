@@ -85,8 +85,8 @@
             const statusCode = res.status;
             if (res.ok) {
                 const data = await res.json();
-                result.set(JSON.parse(data));                  
-                return JSON.parse(data);                
+                result.set(data);                  
+                return data;                
             }
             else if (statusCode == 403){
                 console.log("No Access");
