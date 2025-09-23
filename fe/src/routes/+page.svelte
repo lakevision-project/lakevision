@@ -53,6 +53,23 @@
 	let url = '';
 	let pageSessionId = Date.now().toString(36) + Math.random().toString(36).substring(2);
 
+	// --- Toast Notification State ---
+	let toastProps = {
+		open: false,
+		kind: 'info',
+		title: '',
+		subtitle: ''
+	};
+	let toastTimeout;
+
+	function showToast(kind, title, subtitle, timeout = 4000) {
+		toastProps = { open: true, kind, title, subtitle };
+		if (toastTimeout) clearTimeout(toastTimeout);
+		toastTimeout = setTimeout(() => {
+			toastProps.open = false;
+		}, timeout);
+	}
+
 	$: {
 		selectedNamespce.subscribe((value) => {
 			namespace = value;
@@ -153,7 +170,7 @@
 			scheduledJobs = await response.json();
 		} catch (error) {
 			console.error('Error fetching schedules:', error);
-			alert(error.message);
+			showToast('error', 'Error Fetching Schedules', error.message);
 		} finally {
 			schedulesLoading = false;
 			schedulesLoaded = true; // Mark as loaded
@@ -176,12 +193,12 @@
 				const error = await response.json();
 				throw new Error(error.detail || 'Failed to update schedule');
 			}
-			alert('Schedule updated successfully!');
+			showToast('success', 'Success', 'Schedule updated successfully!');
 			showEditScheduleModal = false;
 			await fetchSchedules();
 		} catch (error) {
 			console.error('Error updating schedule:', error);
-			alert(error.message);
+			showToast('error', 'Update Failed', error.message);
 		}
 	}
 
@@ -192,12 +209,12 @@
 			if (response.status !== 204) {
 				throw new Error('Failed to delete schedule');
 			}
-			alert('Schedule deleted successfully!');
+			showToast('success', 'Success', 'Schedule deleted successfully!');
 			showDeleteConfirmModal = false;
 			await fetchSchedules();
 		} catch (error) {
 			console.error('Error deleting schedule:', error);
-			alert(error.message);
+			showToast('error', 'Delete Failed', error.message);
 		}
 	}
 
@@ -286,7 +303,7 @@
 			insightRuns = data;
 		} catch (error) {
 			console.error('Error fetching table insights:', error);
-			alert('Could not refresh insights data.');
+			showToast('error', 'Refresh Failed', 'Could not refresh insights data.');
 		} finally {
 			insights_loading = false;
 			insightsLoaded = true;
@@ -328,7 +345,7 @@
 
 	async function handleManualRunSubmit() {
 		if (manualRunData.rules_requested.length === 0) {
-			alert('Please select at least one rule to run.');
+			showToast('warning', 'Validation Error', 'Please select at least one rule to run.');
 			return;
 		}
 		try {
@@ -343,7 +360,7 @@
 			});
 			if (response.status !== 202) throw new Error('Failed to start run');
 			const result = await response.json();
-			alert(`Run started successfully! Run ID: ${result.run_id}`);
+			showToast('success', 'Run Started', `Run ID: ${result.run_id}`);
 			openRunModal = false;
 			setTimeout(() => {
 				fetchRunningJobs();
@@ -351,13 +368,13 @@
 			}, 3000);
 		} catch (error) {
 			console.error('Error starting manual run:', error);
-			alert(`Error: ${error.message}`);
+			showToast('error', 'Error Starting Run', error.message);
 		}
 	}
 
 	async function handleScheduleSubmit() {
 		if (scheduleRunData.rules_requested.length === 0) {
-			alert('Please select at least one rule for the schedule.');
+			showToast('warning', 'Validation Error', 'Please select at least one rule for the schedule.');
 			return;
 		}
 		try {
@@ -374,11 +391,11 @@
 			});
 			if (response.status !== 201) throw new Error('Failed to create schedule');
 			const result = await response.json();
-			alert(`Schedule created successfully! Schedule ID: ${result.id}`);
+			showToast('success', 'Schedule Created', `Schedule ID: ${result.id}`);
 			openScheduleModal = false;
 		} catch (error) {
 			console.error('Error creating schedule:', error);
-			alert(`Error: ${error.message}`);
+			showToast('error', 'Error Creating Schedule', error.message);
 		}
 	}
 
@@ -612,6 +629,17 @@
 </script>
 
 <Content>
+	{#if toastProps.open}
+		<ToastNotification
+			kind={toastProps.kind}
+			title={toastProps.title}
+			subtitle={toastProps.subtitle}
+			caption={new Date().toLocaleString()}
+			timeout={0}
+			on:close={() => (toastProps.open = false)}
+			style="position: fixed; top: 10%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; min-width: 300px;"
+		/>
+	{/if}
 	<Tile>
 		<div class="tile-header">
 			<div class="tile-content">
