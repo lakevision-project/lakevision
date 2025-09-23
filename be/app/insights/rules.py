@@ -1,28 +1,47 @@
 from pyiceberg.table import Table 
 from pyiceberg.types import StructType, ListType, MapType, UUIDType
 from typing import Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from app.insights.utils import qualified_table_name
 import yaml
 import os
+import uuid
 import pyarrow.compute as pc
-from .common import TableFile
+from app.insights.common import TableFile
 from collections import defaultdict
 from statistics import median
+from typing import Any, List, Dict, Literal
+from pydantic import BaseModel
+from datetime import datetime, timezone
 
 rules_yaml_path = os.path.join(os.path.dirname(__file__), "rules.yaml")
 
-SEVERAL_FILES = 100
+SEVERAL_FILES = 0
 AVERAGE_SMALL_FILES_IN_BYTES = 100_000
 ONE_GB_IN_BYTES = 1000**3  # 1 GB in bytes (1024**3 is the actual value)
 LARGE_TABLE_IN_BYTES= 50 * ONE_GB_IN_BYTES
 AVERAGE_SMALL_FILES_LARGE_TABLES_IN_BYTES = 50_000
-MAX_SNAPSHOTS_RECOMMENDED = 500
+MAX_SNAPSHOTS_RECOMMENDED = 0
 SKEWED_PARTITION_THRESHOLD_RATIO = 10 
 
 # Load yaml at app startup
 with open(rules_yaml_path) as f:
     INSIGHT_META = yaml.safe_load(f)
+    
+@dataclass
+class Rule:
+    id: str
+    name: str
+    description: str
+    method: Any
+
+class RuleOut(BaseModel):
+    id: str
+    name: str
+    description: str
+
+    class Config:
+        from_attributes = True
 
 @dataclass
 class Insight:
@@ -32,6 +51,15 @@ class Insight:
     severity: str
     suggested_action: str
 
+@dataclass
+class InsightRun:
+    namespace: str
+    table_name: str
+    rules_requested: List[str]
+    run_type: Literal['manual', 'auto']
+    results: List[Insight]
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    run_timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 def rule_small_files(table: Table) -> Optional[Insight]:
@@ -270,3 +298,13 @@ ALL_RULES = [
     rule_skewed_or_largest_partitions_table
 ]
 
+ALL_RULES_OBJECT = [
+    Rule("SMALL_FILES", "Small files", "", rule_small_files),
+    Rule("NO_LOCATION", "No location", "", rule_no_location),
+    Rule("LARGE_FILES", "Large files", "", rule_large_files),
+    Rule("SMALL_FILES_LARGE_TABLE", "Large table with small files", "", rule_small_files_large_table),
+    Rule("UUID_COLUMN", "UUID column", "", rule_column_uuid_table),
+    Rule("NO_ROWS_TABLE", "Empty table", "", rule_no_rows_table),
+    Rule("SNAPSHOT_SPRAWL_TABLE", "Too many snapshots", "", rule_too_many_snapshot_table),
+    Rule("SKEWED_OR_LARGEST_PARTITIONS_TABLE", "Large partition", "", rule_skewed_or_largest_partitions_table)
+]
