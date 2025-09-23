@@ -28,7 +28,7 @@
     onMount(() => {
         const storedWidths = localStorage.getItem('columnWidths');
         if (storedWidths) {
-        columnWidths = storedWidths;
+        columnWidths = JSON.parse(storedWidths);
         }
     });
 
