@@ -204,6 +204,8 @@
 					{#each Object.keys(columns) as key}
 						<div
 							class="cell"
+							role="button"
+							tabindex="0"
 							style="width: {columnWidths[key] || defaultColumnWidth}px"
 							on:dblclick={(event) =>
 								handleDoubleClick(event, displayedData[virtualRow.index]?.[key])}
@@ -226,6 +228,8 @@
 					{#each Object.keys(columns) as key}
 						<div
 							class="cell"
+							role="button"
+							tabindex="0"
 							style="width: {columnWidths[key] || defaultColumnWidth}px"
 							on:dblclick={(event) => handleDoubleClick(event, row[key])}
 						>

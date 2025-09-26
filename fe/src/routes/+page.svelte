@@ -866,6 +866,8 @@
 														{@const ruleResults = row.results.filter((r) => r.code === ruleId)}
 														<div
 															class="rule-item"
+                                                            role="button"
+                                                            tabindex="0"
 															on:click={() => {
 																if (hasResults) {
 																	expandedRules[compositeKey] = !expandedRules[compositeKey];
