@@ -1,6 +1,9 @@
 import pytest
 import os
 from dataclasses import dataclass
+
+os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
+
 from app.storage import get_storage
 from app.storage.interface import StorageInterface
 
