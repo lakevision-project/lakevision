@@ -481,7 +481,7 @@
 		margin-left: 300px; /* Match the SideNav width */
 	}
 	/* Adjust the content container to account for the wider side nav */
-	:global(.bx--label) {
+	:global(.bx--side-nav__navigation  .bx--label) {
 		margin-left: 15px; /* Match the SideNav width */
         color: #fff;
 		font-weight: bold;

@@ -1,8 +1,9 @@
 import os
 from typing import Optional, Type
 
-from .interface import StorageInterface, T
-from .sqlalchemy_adapter import SQLAlchemyStorage
+from app.storage.interface import StorageInterface, T
+from app.storage.sqlalchemy_adapter import SQLAlchemyStorage
+from app.insights.rules import InsightRun
 
 def get_storage(
     model: Type[T],
@@ -16,3 +17,8 @@ def get_storage(
         raise ValueError("Database URL is not provided or set in DATABASE_URL.")
 
     return SQLAlchemyStorage(db_url, model)
+
+run_storage = get_storage(model=InsightRun)
+run_storage.connect()
+run_storage.ensure_table()
+run_storage.disconnect()
