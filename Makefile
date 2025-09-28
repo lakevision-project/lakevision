@@ -46,6 +46,11 @@ run-be:
 	$(CHECK_VENV)
 	cd be && set -a && source ../.env && set +a && PYTHONPATH=app ../$(VENV_PYTHON) -m uvicorn app.api:app --reload --port 8000
 
+.PHONY: run-scheduler
+run-scheduler:
+	$(CHECK_VENV)
+	cd be && set -a && source ../.env && set +a && PYTHONPATH=app ../$(VENV_PYTHON) -m app.scheduler
+
 .PHONY: clean-be
 clean-be:
 	rm -rf be/.venv

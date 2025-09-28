@@ -7,9 +7,10 @@ from croniter import croniter
 
 from app.dependencies import lv, background_job_storage, schedule_storage
 from app.insights.runner import InsightsRunner
-from app.scheduler import JobSchedule
+from app.models import JobSchedule
+from app.storage import get_storage
 from app.models import (
-    RunRequest, RunResponse, StatusResponse,
+    RunRequest, RunResponse, StatusResponse, BackgroundJob, InsightRun, 
     JobScheduleRequest, JobScheduleResponse, JobScheduleUpdateRequest
 )
 
@@ -28,9 +29,10 @@ def run_insights_job(run_id: str, namespace: str, table_name: str | None, rules:
     job.details = f"Processing {len(rules)} rules for '{target}'"
     background_job_storage.save(job)
     print(job.details)
-
+    run_storage = get_storage(model=InsightRun)
     try:
-        runner = InsightsRunner(lv)
+        run_storage.connect()
+        runner = InsightsRunner(lv, run_storage)
         results = runner.run_for_table(f"{namespace}.{table_name}", rule_ids=rules)
         results_list = [res.__dict__ for res in results]
 
@@ -50,6 +52,8 @@ def run_insights_job(run_id: str, namespace: str, table_name: str | None, rules:
         job.details = f"An error occurred: {str(e)}"
         background_job_storage.save(job)
         print(f"Job {run_id} failed: {e}")
+    finally:
+        run_storage.disconnect()
 
 # --- Manual Job Endpoints ---
 @router.post("/api/start-run", response_model=RunResponse, status_code=202)

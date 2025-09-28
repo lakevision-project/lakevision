@@ -1,67 +1,32 @@
 from pyiceberg.table import Table 
 from pyiceberg.types import StructType, ListType, MapType, UUIDType
 from typing import Optional
-from dataclasses import dataclass, field
 from app.insights.utils import qualified_table_name
 import yaml
 import os
-import uuid
 import pyarrow.compute as pc
-from app.insights.common import TableFile
+from app.models import TableFile
 from collections import defaultdict
 from statistics import median
-from typing import Any, List, Dict, Literal
-from pydantic import BaseModel
-from datetime import datetime, timezone
+from typing import Dict
+
+from app.models import Rule
+from app.models import Insight
 
 rules_yaml_path = os.path.join(os.path.dirname(__file__), "rules.yaml")
 
-SEVERAL_FILES = 0
+SEVERAL_FILES = 100
 AVERAGE_SMALL_FILES_IN_BYTES = 100_000
 ONE_GB_IN_BYTES = 1000**3  # 1 GB in bytes (1024**3 is the actual value)
 LARGE_TABLE_IN_BYTES= 50 * ONE_GB_IN_BYTES
 AVERAGE_SMALL_FILES_LARGE_TABLES_IN_BYTES = 50_000
-MAX_SNAPSHOTS_RECOMMENDED = 0
+MAX_SNAPSHOTS_RECOMMENDED = 500
 SKEWED_PARTITION_THRESHOLD_RATIO = 10 
 
 # Load yaml at app startup
 with open(rules_yaml_path) as f:
     INSIGHT_META = yaml.safe_load(f)
     
-@dataclass
-class Rule:
-    id: str
-    name: str
-    description: str
-    method: Any
-
-class RuleOut(BaseModel):
-    id: str
-    name: str
-    description: str
-
-    class Config:
-        from_attributes = True
-
-@dataclass
-class Insight:
-    code: str
-    table: str
-    message: str
-    severity: str
-    suggested_action: str
-
-@dataclass
-class InsightRun:
-    namespace: str
-    table_name: str
-    rules_requested: List[str]
-    run_type: Literal['manual', 'auto']
-    results: List[Insight]
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    run_timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-
-
 def rule_small_files(table: Table) -> Optional[Insight]:
     files = [file_scan_task.file.file_size_in_bytes for file_scan_task in table.scan().plan_files()]
     if not files:

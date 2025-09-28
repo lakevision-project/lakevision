@@ -3,12 +3,14 @@ from typing import List, Optional, Literal, Dict, Any
 from datetime import datetime, timezone
 import dataclasses
 from dataclasses import dataclass, field
+import uuid
 
-# --- General ---
+from pyiceberg.table import FileScanTask
+from pyiceberg.typedef import Record
+
 class TokenRequest(BaseModel):
     code: str
 
-# --- Background Jobs ---
 class RunRequest(BaseModel):
     namespace: str
     table_name: str | None = None
@@ -74,3 +76,89 @@ class JobScheduleResponse(JobScheduleRequest):
     next_run_timestamp: datetime
     last_run_timestamp: Optional[datetime] = None
     created_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+@dataclass
+class JobSchedule:
+    """
+    Defines a scheduled job for running insights.
+    This maps directly to a 'jobschedules' table in your DB.
+    """
+
+    namespace: str
+    table_name: Optional[str] # NULL if it's a namespace-level job
+    rules_requested: List[str]
+
+    cron_schedule: str # e.g., "0 * * * *" (every hour at minute 0)
+
+    next_run_timestamp: datetime
+
+    created_by: str # e.g., user email
+    last_run_timestamp: Optional[datetime] = None
+    created_timestamp: datetime = field(default_factory=datetime.utcnow)
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    is_enabled: bool = True
+
+
+@dataclass
+class Rule:
+    id: str
+    name: str
+    description: str
+    method: Any
+
+
+class RuleOut(BaseModel):
+    id: str
+    name: str
+    description: str
+
+    class Config:
+        from_attributes = True
+
+
+@dataclass
+class Insight:
+    code: str
+    table: str
+    message: str
+    severity: str
+    suggested_action: str
+
+
+@dataclass
+class InsightRun:
+    namespace: str
+    table_name: str
+    rules_requested: List[str]
+    run_type: Literal['manual', 'auto']
+    results: List[Insight]
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    run_timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ColumnFilter(BaseModel):
+    name: str
+    value: str
+
+
+class TableFile(BaseModel):
+    path: str
+    format: str
+    partition: List[ColumnFilter]
+    records: int
+    size_bytes: int
+
+    @classmethod
+    def from_task(cls, task: FileScanTask):
+        re: Record = task.file.partition
+        partition = []
+        for key, value in re.__dict__.items():
+            partition.append(ColumnFilter(name=key, value=str(value)))
+        return cls(
+            path = task.file.file_path,
+            format = task.file.file_format,
+            partition = partition,
+            records = task.file.record_count,
+            size_bytes = task.file.file_size_in_bytes
+        )

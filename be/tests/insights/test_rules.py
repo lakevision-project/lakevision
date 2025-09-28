@@ -140,16 +140,16 @@ table_rules = {
         ('namespace1.table5'),
         ('namespace1.table6')
     ])
-def test_run_for_table(table):
+def test_run_for_table(run_storage_fixture, table):
     lakeview = MockLakeView()
-    runner = InsightsRunner(lakeview)
+    runner = InsightsRunner(lakeview, run_storage_fixture)
     results = runner.run_for_table(table)
     codes = {r.code for r in results}
     assert set(codes) == set(table_rules[table])
 
-def test_run_for_namespace():
+def test_run_for_namespace(run_storage_fixture):
     lakeview = MockLakeView()
-    runner = InsightsRunner(lakeview)
+    runner = InsightsRunner(lakeview, run_storage_fixture)
     ns_results = runner.run_for_namespace("namespace1")
     assert "namespace1.table1" in ns_results
     assert "namespace1.table2" in ns_results
@@ -167,9 +167,9 @@ def test_run_for_namespace():
     assert set(codes4) == set(table_rules["namespace1.table4"])
     assert set(codes5) == set(table_rules["namespace1.table5"])
 
-def test_run_for_lakehouse():
+def test_run_for_lakehouse(run_storage_fixture):
     lakeview = MockLakeView()
-    runner = InsightsRunner(lakeview)
+    runner = InsightsRunner(lakeview, run_storage_fixture)
     all_results = runner.run_for_lakehouse()
     assert "namespace1.table1" in all_results
     assert "namespace1.table2" in all_results

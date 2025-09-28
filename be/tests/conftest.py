@@ -5,6 +5,7 @@ from dataclasses import dataclass
 os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
 
 from app.storage import get_storage
+from app.models import InsightRun
 from app.storage.interface import StorageInterface
 
 @dataclass
@@ -20,6 +21,13 @@ def user_model():
     """Provides the User dataclass model to tests."""
     return User
 
+@pytest.fixture(scope="function")
+def run_storage_fixture():
+    storage = get_storage(model=InsightRun, db_url="sqlite:///:memory:")
+    storage.connect()
+    storage.ensure_table()
+    yield storage
+    storage.disconnect()
 
 @pytest.fixture
 def sqlalchemy_in_memory_storage(user_model):

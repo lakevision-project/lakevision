@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Type, Union, get_args, get_origin
 
 from sqlalchemy import (TIMESTAMP, Boolean, Column, Float, Integer, MetaData,
-                          String, Table, Text, create_engine, inspect, text)
+                          String, Table, Text, create_engine, inspect, text, bindparam)
 from sqlalchemy.engine import Engine
 
 from app.storage.interface import AggregateFunction, StorageInterface, T
@@ -161,9 +161,13 @@ class SQLAlchemyStorage(StorageInterface[T]):
             # Step A: Delete all existing records matching the provided IDs.
             # Using 'WHERE id IN (...)' is highly efficient for bulk deletes.
             if item_ids:
-                # SQLAlchemy automatically handles the expansion of the tuple for the IN clause
-                delete_stmt = text(f"DELETE FROM {self.table_name} WHERE id IN :ids")
-                conn.execute(delete_stmt, {"ids": tuple(item_ids)})
+                # Use an expanding bind parameter for the IN clause.
+                # This lets SQLAlchemy generate the correct number of placeholders (?, ?, ...)
+                # for the specific database dialect (like SQLite).
+                delete_stmt = text(f"DELETE FROM {self.table_name} WHERE id IN :ids").bindparams(
+                    bindparam("ids", expanding=True)
+                )
+                conn.execute(delete_stmt, {"ids": item_ids})
 
             # Step B: Perform a bulk insert with all the new item data.
             # We can get the structure from the first item, as they are all the same.
