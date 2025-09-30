@@ -17,6 +17,9 @@ help:
 	@echo "  make clean-be          - Remove backend virtualenv"
 	@echo "  make clean-catalog     - Remove sample catalog and warehouse files"
 	@echo ""
+	@echo ""
+	@echo "Scheduler:"
+	@echo "  make run-scheduler     - Run scheduler app"
 	@echo "Frontend:"
 	@echo "  make init-fe           - Install frontend dependencies"
 	@echo "  make run-fe            - Run frontend dev server"
@@ -46,11 +49,6 @@ run-be:
 	$(CHECK_VENV)
 	cd be && set -a && source ../.env && set +a && PYTHONPATH=app ../$(VENV_PYTHON) -m uvicorn app.api:app --reload --port 8000
 
-.PHONY: run-scheduler
-run-scheduler:
-	$(CHECK_VENV)
-	cd be && set -a && source ../.env && set +a && PYTHONPATH=app ../$(VENV_PYTHON) -m app.scheduler
-
 .PHONY: clean-be
 clean-be:
 	rm -rf be/.venv
@@ -76,6 +74,13 @@ clean-catalog:
 test-be:
 	$(CHECK_VENV)
 	cd be && PYTHONPATH=app ../$(VENV_PYTHON) -m pytest tests
+
+# --- Scheduler ---
+
+.PHONY: run-scheduler
+run-scheduler:
+	$(CHECK_VENV)
+	cd be && set -a && source ../.env && set +a && PYTHONPATH=app ../$(VENV_PYTHON) -m app.scheduler
 
 # --- Frontend ---
 
