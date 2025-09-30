@@ -264,12 +264,12 @@ ALL_RULES = [
 ]
 
 ALL_RULES_OBJECT = [
-    Rule("SMALL_FILES", "Small files", "", rule_small_files),
-    Rule("NO_LOCATION", "No location", "", rule_no_location),
-    Rule("LARGE_FILES", "Large files", "", rule_large_files),
-    Rule("SMALL_FILES_LARGE_TABLE", "Large table with small files", "", rule_small_files_large_table),
-    Rule("UUID_COLUMN", "UUID column", "", rule_column_uuid_table),
-    Rule("NO_ROWS_TABLE", "Empty table", "", rule_no_rows_table),
-    Rule("SNAPSHOT_SPRAWL_TABLE", "Too many snapshots", "", rule_too_many_snapshot_table),
-    Rule("SKEWED_OR_LARGEST_PARTITIONS_TABLE", "Large partition", "", rule_skewed_or_largest_partitions_table)
+    Rule("SMALL_FILES", "Many small files", "Table with many small data files could improve performance with fewer, larger files. Use optimize or less partitioning to improve.", rule_small_files),
+    Rule("NO_LOCATION", "No location", "The table has no location set", rule_no_location),
+    Rule("LARGE_FILES", "Large files", "Table with single/avg parquet file size >1GB, leading to large memory overhead and degraded process distribution. Rewrite table with a lower target maximum file size.", rule_large_files),
+    Rule("SMALL_FILES_LARGE_TABLE", "Large table with small files", "Table with <50MB per parquet file and larger than 50GB total. Use optimize or less partitioning to improve.", rule_small_files_large_table),
+    Rule("UUID_COLUMN", "UUID type not universally supported", "UUID column type may not be supported in all environments, especially Spark and older Presto", rule_column_uuid_table),
+    Rule("NO_ROWS_TABLE", "Empty table", "Table has been declared but has no data. Possibly intentional.", rule_no_rows_table),
+    Rule("SNAPSHOT_SPRAWL_TABLE", "Too many snapshots", "A high snapshot count for a table creates memory and process overhead for the catalog service and catalog results processing on clients. Expire snapshots or adjust snapshot age configuration if practical.", rule_too_many_snapshot_table),
+    Rule("SKEWED_OR_LARGEST_PARTITIONS_TABLE", "Large partition", "The table contains one partition that is considerably larger than the rest. Evaluate if the table can be repartitioned by another column/criteria.", rule_skewed_or_largest_partitions_table)
 ]
