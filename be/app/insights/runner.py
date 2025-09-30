@@ -29,7 +29,7 @@ class InsightsRunner:
             params['table_name'] = table_name
 
         # 2. Add the condition for the 'results' column if showEmpty is False
-        if not showEmpty:
+        elif not showEmpty:
             # This condition filters out both NULL and empty JSON arrays '[]'
             where_clauses.append('"results" IS NOT NULL AND "results" != \'[]\'')
 
