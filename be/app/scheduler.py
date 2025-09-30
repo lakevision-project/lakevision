@@ -22,7 +22,12 @@ def execute_job(schedule: JobSchedule, storage: StorageInterface):
         target += f".{schedule.table_name}"
     print(f"Executing job for target '{target}'")
 
-    runner.run_for_table(target, rule_ids=schedule.rules_requested, type="auto")
+    if schedule.namespace=="*":
+        runner.run_for_lakehouse(rule_ids=schedule.rules_requested, type="auto")
+    elif schedule.table_name:
+        runner.run_for_table(target, rule_ids=schedule.rules_requested, type="auto")
+    else:
+        runner.run_for_namespace(schedule.namespace, rule_ids=schedule.rules_requested, type="auto")
 
     print(f"Execution finished for schedule {schedule.id}.")
 
