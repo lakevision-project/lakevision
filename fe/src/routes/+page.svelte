@@ -122,16 +122,16 @@
 
 	// --- Define columns for the virtual tables ---
 	const completedRunsColumns = {
-		'Run Type': '', Namespace: '', 'Table Name': '', Timestamp: '', 'Rules & Results': ''
+		'Job Type': '', Namespace: '', 'Table Name': '', Timestamp: '', 'Rules & Results': ''
 	};
 	let completedRunsColWidths = {
-		'Run Type': 120, Namespace: 150, 'Table Name': 200, Timestamp: 220, 'Rules & Results': 600
+		'Job Type': 120, Namespace: 150, 'Table Name': 200, Timestamp: 220, 'Rules & Results': 600
 	};
 	const runningJobsColumns = {
-		'Run ID': '', Namespace: '', 'Table Name': '', Status: '', 'Started At': ''
+		'Job ID': '', Namespace: '', 'Table Name': '', Status: '', 'Started At': ''
 	};
 	let runningJobsColWidths = {
-		'Run ID': 300, Namespace: 150, 'Table Name': 200, Status: 120, 'Started At': 220
+		'Job ID': 300, Namespace: 150, 'Table Name': 200, Status: 120, 'Started At': 220
 	};
 	const scheduledJobsColumns = {
 		Namespace: '', 'Table Name': '', Rules: '', Schedule: '', Enabled: '', 'Next Run': ''
@@ -160,7 +160,7 @@
 		insights_loading = true;
 		try {
 			const response = await fetch(`/api/namespaces/*/insights?&size=${completedRunsLimit}&showEmpty=${showEmptyResults}`);
-			if (!response.ok) throw new Error('Failed to fetch latest insights');
+			if (!response.ok) throw new Error('Failed to fetch latest runs');
 			
 			const rawData = await response.json();
 
@@ -174,7 +174,7 @@
 
 			insightRuns = rawData;
 
-		} catch (error) { console.error('Error fetching latest insights:', error); }
+		} catch (error) { console.error('Error fetching latest runs:', error); }
 		finally { insights_loading = false; }
 	}
 
@@ -249,13 +249,13 @@
 					rules_requested: manualRunData.rules_requested
 				})
 			});
-			if (response.status !== 202) throw new Error('Failed to start run');
+			if (response.status !== 202) throw new Error('Failed to start job');
 			const result = await response.json();
-			showToast('success', 'Run Started', `Run ID: ${result.run_id}`);
+			showToast('success', 'Job Started', `Job ID: ${result.run_id}`);
 			openRunModal = false;
 			setTimeout(fetchRunningJobs, 2000);
 		} catch (error) {
-			showToast('error', 'Error Starting Run', error.message);
+			showToast('error', 'Error Starting Job', error.message);
 		}
 	}
 
@@ -309,26 +309,26 @@
 	{/if}
 
 	<div class="header-container">
-		<h1>Lakehouse Overview</h1>
+		<h1>Lakehouse Health</h1>
 		<ButtonSet>
 			<Button icon="{Run}" on:click="{() => {
 				manualRunData.rules_requested = allRules.map(rule => rule.id);
 				runModalSelectedNsId = '*'; // Set default ID
 				openRunModal = true;
-			}}">Run Insights</Button>
+			}}">Run Health Check</Button>
 			<Button icon="{Calendar}" kind="secondary" on:click="{() => {
 				scheduleRunData.rules_requested = allRules.map(rule => rule.id);
 				scheduleModalSelectedNsId = '*'; // Set default ID
 				openScheduleModal = true;
-			}}">Schedule Job</Button>
+			}}">Schedule Health Check</Button>
 			<Button kind="ghost" class="cds--btn--icon-only" icon="{Renew}" iconDescription="Refresh All Data" on:click="{() => { fetchLatestInsights(); fetchRunningJobs(); fetchSchedules(); }}"/>
 		</ButtonSet>
 	</div>
 
 	<Tabs bind:selected="{insightsSubTab}" style="margin-top: 1rem;">
-		<Tab label="Completed Runs" />
+		<Tab label="Completed Jobs" />
 		<Tab label="In-Progress Jobs" />
-		<Tab label="Scheduled Runs" />
+		<Tab label="Scheduled Jobs" />
 	</Tabs>
 	<div class="tab-content-container">
 		{#if insightsSubTab === 0}
@@ -349,7 +349,7 @@
 			{#if insights_loading}
 				<DataTableSkeleton rowCount="{5}" columnCount="{5}" />
 			{:else if insightRuns.length === 0}
-				<p>No completed insight runs found across the lakehouse.</p>
+				<p>No completed health check jobs found across the lakehouse.</p>
 			{:else}
 				<VirtualTable
 					data="{insightRuns}"
@@ -359,7 +359,7 @@
 					enableSearch="{true}"
 				>
 					<div slot="cell" let:row let:columnKey let:searchQuery>
-						{#if columnKey === 'Run Type'}
+						{#if columnKey === 'Job Type'}
 							<Tag type="{row.run_type === 'manual' ? 'cyan' : 'green'}" title="{row.run_type}"
 								>{row.run_type}</Tag
 							>
@@ -436,7 +436,7 @@
 			{#if schedulesLoading}
 				<DataTableSkeleton rowCount="{3}" columnCount="{6}" />
 			{:else if scheduledJobs.length === 0}
-				<p>No insight runs are scheduled.</p>
+				<p>No health checks runs are scheduled.</p>
 			{:else}
 				<VirtualTable
 					data="{scheduledJobs}"
@@ -452,7 +452,7 @@
 							<Tag type="{row.is_enabled ? 'green' : 'gray'}"
 								>{row.is_enabled ? 'Enabled' : 'Disabled'}</Tag
 							>
-						{:else if columnKey === 'Next Run'}
+						{:else if columnKey === 'Next Job'}
 							{@html highlightMatch(new Date(row.next_run_timestamp).toLocaleString(), searchQuery)}
 						{:else}
 							{@html highlightMatch(row[columnKey.toLowerCase().replace(/ /g, '_')], searchQuery)}
@@ -465,14 +465,14 @@
 
 	<Modal
 		bind:open="{openRunModal}"
-		modalHeading="Run New Global Insight"
-		primaryButtonText="Start Run"
+		modalHeading="Run New Health Check"
+		primaryButtonText="Start Job"
 		secondaryButtonText="Cancel"
 		on:submit="{handleManualRunSubmit}"
 		on:close="{resetModalForms}"
 		on:click:button--secondary="{() => openRunModal = false}"
 	>
-		<p>This will run the selected insights on all applicable tables across the selected namespace.</p>
+		<p>This will run the selected health check on all applicable tables across the selected namespace.</p>
 		<FormGroup legendText="Namespace">
 			<ComboBox
 				items="{dropdownNamespaces}"
@@ -483,7 +483,7 @@
 		<div class="bx--form-item">
 			<fieldset class="bx--fieldset">
 				<legend class="bx--label legend-with-icon">
-					<span>Rules to Run</span>
+					<span>Rules to Check</span>
 					<button class="info-button" on:click="{() => showRulesInfoModal = true}" title="View rule descriptions">
 						<Information size="{16}" />
 					</button>
@@ -501,14 +501,14 @@
 
 	<Modal
 		bind:open="{openScheduleModal}"
-		modalHeading="Schedule New Global Insight Run"
+		modalHeading="Schedule New Health Check Job"
 		primaryButtonText="Create Schedule"
 		secondaryButtonText="Cancel"
 		on:submit="{handleScheduleSubmit}"
 		on:close="{resetModalForms}"
 		on:click:button--secondary="{() => openScheduleModal = false}"
 	>
-		<p>This will schedule the selected insights to run on all applicable tables across the selected namespace.</p>
+		<p>This will schedule the selected health check to run on all applicable tables across the selected namespace.</p>
 		<FormGroup legendText="Namespace">
 			<ComboBox
 				items="{dropdownNamespaces}"
@@ -519,7 +519,7 @@
 		<div class="bx--form-item">
 			<fieldset class="bx--fieldset">
 				<legend class="bx--label legend-with-icon">
-					<span>Rules to Schedule</span>
+					<span>Rules to Check</span>
 					<button class="info-button" on:click="{() => showRulesInfoModal = true}" title="View rule descriptions">
 						<Information size="{16}" />
 					</button>
@@ -548,7 +548,7 @@
 	<Modal
 		passiveModal
 		bind:open="{showRulesInfoModal}"
-		modalHeading="Available Insight Rules"
+		modalHeading="Available Health Check Rules"
 		size="lg"
 	>
 		<table class="rules-table">

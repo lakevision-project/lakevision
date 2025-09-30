@@ -111,8 +111,8 @@
 </script>
 
 <Header company="{company}" platformName="{platform}">
-	<HeaderNavItem href="/" text="Lakehouse View" />
-	<HeaderNavItem href="/table-view" text="Table View" />
+	<HeaderNavItem href="/" text="Home" />
+	<HeaderNavItem href="/table-view" text="Tables" />
 
 	<HeaderUtilities>
 		<HeaderActionLink href="https://github.com/IBM/lakevision" target="_blank">

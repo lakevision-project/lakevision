@@ -324,11 +324,11 @@
 
 	let runningJobs = [];
 	let runningJobsLoading = true;
-	const runningJobsColumns = { 'Run ID': '', Status: '', Details: '', 'Started At': '' };
-	let runningJobsColumnWidths = { 'Run ID': 300, Status: 120, Details: 400, 'Started At': 220 };
+	const runningJobsColumns = { 'Job ID': '', Status: '', Details: '', 'Started At': '' };
+	let runningJobsColumnWidths = { 'Job ID': 300, Status: 120, Details: 400, 'Started At': 220 };
 
-	const virtualTableColumns = { 'Run Type': '', Timestamp: '', 'Rules & Results': '' };
-	let columnWidths = { 'Run Type': 150, Timestamp: 250, 'Rules & Results': 600 };
+	const virtualTableColumns = { 'Job Type': '', Timestamp: '', 'Rules & Results': '' };
+	let columnWidths = { 'Job Type': 150, Timestamp: 250, 'Rules & Results': 600 };
 
 	let manualRunData = { namespace: '', tableName: '', rules_requested: [] };
 	let manualRunSelectAll = false;
@@ -496,7 +496,7 @@
 		insights_loading = true;
 		try {
 			const response = await fetch(`/api/namespaces/${namespace}/${table}/insights?size=100`);
-			if (!response.ok) throw new Error('Failed to fetch insights');
+			if (!response.ok) throw new Error('Failed to fetch jobs');
 
 			const data = await response.json();
 			data.sort((a, b) => new Date(b.run_timestamp) - new Date(a.run_timestamp));
@@ -511,8 +511,8 @@
 			expandedRules = newExpandedState;
 			insightRuns = data;
 		} catch (error) {
-			console.error('Error fetching table insights:', error);
-			showToast('error', 'Refresh Failed', 'Could not refresh insights data.');
+			console.error('Error fetching table jobs:', error);
+			showToast('error', 'Refresh Failed', 'Could not refresh jobs data.');
 		} finally {
 			insights_loading = false;
 			insightsLoaded = true;
@@ -528,7 +528,7 @@
 			const data = await response.json();
 			runningJobs = data.map((job) => ({
 				id: job.run_id,
-				'Run ID': job.run_id,
+				'Job ID': job.run_id,
 				Status: job.status,
 				Details: job.details,
 				'Started At': job.started_at
@@ -554,7 +554,7 @@
 
 	async function handleManualRunSubmit() {
 		if (manualRunData.rules_requested.length === 0) {
-			showToast('warning', 'Validation Error', 'Please select at least one rule to run.');
+			showToast('warning', 'Validation Error', 'Please select at least one rule to check.');
 			return;
 		}
 		try {
@@ -567,17 +567,17 @@
 					rules_requested: manualRunData.rules_requested
 				})
 			});
-			if (response.status !== 202) throw new Error('Failed to start run');
+			if (response.status !== 202) throw new Error('Failed to start job');
 			const result = await response.json();
-			showToast('success', 'Run Started', `Run ID: ${result.run_id}`);
+			showToast('success', 'Job Started', `Job ID: ${result.run_id}`);
 			openRunModal = false;
 			setTimeout(() => {
 				fetchRunningJobs();
 				fetchTableInsights();
 			}, 3000);
 		} catch (error) {
-			console.error('Error starting manual run:', error);
-			showToast('error', 'Error Starting Run', error.message);
+			console.error('Error starting manual job:', error);
+			showToast('error', 'Error Starting Job', error.message);
 		}
 	}
 
@@ -1042,7 +1042,7 @@
 		<Tab label="Snapshots" />
 		<Tab label="Sample Data" />
 		<Tab label="SQL" />
-		<Tab label="Insights" />
+		<Tab label="Health Check" />
 
 		<svelte:fragment slot="content">
 			<TabContent><br />
@@ -1178,12 +1178,12 @@
 							manualRunData.rules_requested = allRules.map(rule => rule.id);
 							openRunModal = true;
 						}
-					}">Run Insights</Button>
+					}">Run Health Check</Button>
 					<Button icon="{Calendar}" kind="secondary" on:click="{() => {
 						scheduleRunData.rules_requested = allRules.map(rule => rule.id);
 						openScheduleModal = true;
 					}}">
-						Schedule Run
+						Schedule Health Check
 					</Button>
 					<Button
 						kind="ghost"
@@ -1201,16 +1201,16 @@
 				</ButtonSet>
 				<div style="margin-top: 1.5rem;">
 					<Tabs bind:selected="{insightsSubTab}">
-						<Tab label="Completed Runs" />
+						<Tab label="Completed Jobs" />
 						<Tab label="In-Progress Jobs" />
-						<Tab label="Scheduled Runs" />
+						<Tab label="Scheduled Jobs" />
 					</Tabs>
 					<div class="tab-content-container">
 						{#if insightsSubTab === 0}
 							{#if insights_loading}
 								<DataTableSkeleton rowCount="{5}" columnCount="{3}" />
 							{:else if insightRuns.length === 0}
-								<p>No insights for this table.</p>
+								<p>No health checks for this table.</p>
 							{:else}
 								<div class="insights-virtual-table-container">
 									<VirtualTable
@@ -1220,7 +1220,7 @@
 										bind:columnWidths
 									>
 										<div slot="cell" let:row let:columnKey>
-											{#if columnKey === 'Run Type'}
+											{#if columnKey === 'Job Type'}
 												<Tag
 													type="{row.run_type === 'manual' ? 'cyan' : 'green'}"
 													title="{row.run_type}">{row.run_type}</Tag
@@ -1314,7 +1314,7 @@
 							{#if schedulesLoading}
 								<DataTableSkeleton rowCount="{3}" columnCount="{5}" />
 							{:else if scheduledJobs.length === 0}
-								<p>There are no scheduled runs for this table.</p>
+								<p>There are no scheduled jobs for this table.</p>
 							{:else}
 								<VirtualTable
 									data="{scheduledJobs}"
@@ -1366,8 +1366,8 @@
 
 <Modal
 	bind:open="{openRunModal}"
-	modalHeading="Run New Insight"
-	primaryButtonText="Start Run"
+	modalHeading="Run New Health Check"
+	primaryButtonText="Start Job"
 	secondaryButtonText="Cancel"
 	on:submit="{handleManualRunSubmit}"
 	on:click:button--secondary="{() => (openRunModal = false)}"
@@ -1387,7 +1387,7 @@
 	<hr class="modal-divider" />
 	<FormGroup>
 		<legend class="bx--label legend-with-icon">
-			<span>Rules to Run</span>
+			<span>Rules to check</span>
 			<button class="info-button" on:click="{() => showRulesInfoModal = true}" title="View rule descriptions">
 				<Information size="{16}" />
 			</button>
@@ -1416,7 +1416,7 @@
 </Modal>
 <Modal
 	bind:open="{openScheduleModal}"
-	modalHeading="Schedule New Insight Run"
+	modalHeading="Schedule New Health Check"
 	primaryButtonText="Create Schedule"
 	secondaryButtonText="Cancel"
 	on:submit="{handleScheduleSubmit}"
@@ -1437,7 +1437,7 @@
 	<hr class="modal-divider" />
 	<FormGroup>
 		<legend class="bx--label legend-with-icon">
-			<span>Rules to Run</span>
+			<span>Rules to Check</span>
 			<button class="info-button" on:click="{() => showRulesInfoModal = true}" title="View rule descriptions">
 				<Information size="{16}" />
 			</button>
@@ -1531,7 +1531,7 @@
 		on:close="{() => (scheduleToDelete = null)}"
 		on:click:button--secondary="{() => (showDeleteConfirmModal = false)}"
 	>
-		<p>Are you sure you want to delete this scheduled run?</p>
+		<p>Are you sure you want to delete this scheduled job?</p>
 		<strong>{scheduleToDelete.cron_schedule}</strong>
 	</Modal>
 {/if}
@@ -1539,7 +1539,7 @@
 <Modal
 	passiveModal
 	bind:open="{showRulesInfoModal}"
-	modalHeading="Available Insight Rules"
+	modalHeading="Available Health Check Rules"
 	size="lg"
 >
 	<table class="rules-table">
