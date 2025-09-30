@@ -132,7 +132,17 @@ def delete_schedule(schedule_id: str):
 
 @router.get("/api/schedules", response_model=List[JobScheduleResponse])
 def list_schedules(namespace: str, table_name: Optional[str] = None):
-    criteria = {"namespace": namespace}
-    if table_name:
-        criteria["table_name"] = table_name
+    # If namespace is '*', the criteria is to find schedules
+    # where the table_name is not set (is NULL).
+    print(namespace)
+    if namespace == "*":
+        print("true")
+        criteria = {"table_name": None}
+    else:
+        print("false")
+        # Otherwise, use the original logic.
+        criteria = {"namespace": namespace}
+        if table_name:
+            criteria["table_name"] = table_name
+            
     return schedule_storage.get_by_attributes(criteria)

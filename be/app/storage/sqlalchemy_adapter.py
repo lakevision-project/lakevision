@@ -242,6 +242,8 @@ class SQLAlchemyStorage(StorageInterface[T]):
                     # Add the individual values to the params dict
                     for p_name, p_value in zip(param_names, value):
                         params[p_name] = p_value
+                elif value is None:
+                    clauses.append(f'"{attr}" IS NULL')
                 else:
                     # Handle standard equals (=) clause for non-list values
                     clauses.append(f'"{attr}" = :{attr}')
@@ -271,6 +273,7 @@ class SQLAlchemyStorage(StorageInterface[T]):
             print(stmt)
             # 4. Execute with the correctly built parameters
             results = conn.execute(stmt, params).mappings().all()
+            print(len(results))
 
         deserialized_results = [self._deserialize_row(dict(row)) for row in results]
         return [self.model(**row) for row in deserialized_results]
