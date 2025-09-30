@@ -1,0 +1,64 @@
+.bx--content {
+	margin-left: 300px;
+}
+
+.bx--side-nav__navigation .bx--label {
+	margin-left: 15px;
+	color: #fff;
+	font-weight: bold;
+}
+
+.bx--side-nav__navigation {
+	background-color: #161616;
+}
+
+.bx--side-nav__link .bx--side-nav__icon svg {
+	fill: #ffffff;
+}
+
+mark {
+    background-color: rgb(254, 254, 0);
+    color: inherit;
+    padding: 0;
+    font-weight: bold;
+}
+button.cds--btn--icon-only {
+    min-width: 2.5rem !important;
+    width: 2.5rem !important;
+    flex-grow: 0 !important;
+}
+
+.legend-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.info-button {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    color: var(--cds-interactive-01, #0f62fe);
+}
+
+.rules-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.rules-table th,
+.rules-table td {
+    border: 1px solid var(--cds-border-subtle, #e0e0e0);
+    padding: 0.75rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.rules-table th {
+    background-color: var(--cds-background-hover, #f4f4f4);
+    font-weight: 600;
+}

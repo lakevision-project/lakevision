@@ -148,6 +148,7 @@
 			.replace(/'/g, '&#039;');
 	}
 	function highlightMatch(text, query) {
+		console.log(text)
 		if (!query || !text) return escapeHtml(text);
 		const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
 		return escapeHtml(text).replace(regex, '<mark>$1</mark>');
@@ -233,7 +234,7 @@
 							style="width: {columnWidths[key] || defaultColumnWidth}px"
 							on:dblclick={(event) => handleDoubleClick(event, row[key])}
 						>
-							<slot name="cell" {row} columnKey={key}>
+							<slot name="cell" {row} columnKey={key} {searchQuery}>
 								{@html highlightMatch(formatValue(row[key]), searchQuery)}
 							</slot>
 						</div>
@@ -306,11 +307,5 @@
 		display: flex;
 		justify-content: flex-end;
 		margin-bottom: 10px;
-	}
-	:global(mark) {
-		background-color: rgb(254, 254, 0);
-		color: inherit;
-		padding: 0;
-		font-weight: bold;
 	}
 </style>
