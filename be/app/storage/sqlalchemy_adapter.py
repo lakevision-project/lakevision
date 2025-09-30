@@ -41,7 +41,11 @@ class SQLAlchemyStorage(StorageInterface[T]):
 
     def connect(self) -> None:
         if not self._engine:
-            self._engine = create_engine(self._db_url)
+            self._engine = create_engine(
+                self._db_url,
+                pool_pre_ping=True,
+                pool_recycle=1800  # 30 minutes
+            )
 
     def disconnect(self) -> None:
         if self._engine:
@@ -264,7 +268,7 @@ class SQLAlchemyStorage(StorageInterface[T]):
         engine = self._get_engine()
         with engine.connect() as conn:
             stmt = text(sql_query)
-            
+            print(stmt)
             # 4. Execute with the correctly built parameters
             results = conn.execute(stmt, params).mappings().all()
 

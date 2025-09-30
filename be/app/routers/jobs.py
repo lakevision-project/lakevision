@@ -32,8 +32,15 @@ def run_insights_job(run_id: str, namespace: str, table_name: str | None, rules:
     run_storage = get_storage(model=InsightRun)
     try:
         run_storage.connect()
+        run_storage.ensure_table()
         runner = InsightsRunner(lv, run_storage)
-        results = runner.run_for_table(f"{namespace}.{table_name}", rule_ids=rules)
+        if namespace=="*":
+            results = runner.run_for_lakehouse(rule_ids=rules)
+        elif table_name:
+            results = runner.run_for_table(f"{namespace}.{table_name}", rule_ids=rules)
+        else:
+            results = runner.run_for_namespace(namespace, rule_ids=rules)
+        
         results_list = [res.__dict__ for res in results]
 
         job = background_job_storage.get_by_id(run_id)

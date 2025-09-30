@@ -24,6 +24,7 @@ def get_runner():
     try:
         # 2. Connect to the database
         storage.connect()
+        storage.ensure_table()
         # 3. Create the runner with its dependencies
         runner = InsightsRunner(lakeview=lv, storage_adapter=storage)
         # 4. Yield the runner to the endpoint function

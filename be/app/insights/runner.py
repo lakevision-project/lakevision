@@ -10,18 +10,43 @@ class InsightsRunner:
         self.lakeview = lakeview
         self.storage_adapter = storage_adapter
 
-    def get_latest_run(self, table_identifier: str, size: int):
+    def get_latest_run(self, namespace: str, size: int, table_name: str = None, showEmpty: bool = True):
         """
         Fetches a paginated list of insight runs from storage.
+        If namespace is '*', it fetches runs from all namespaces.
+        If showEmpty is False, it only returns runs where the results list is not empty.
         """
-        namespace, table_name = get_namespace_and_table_name(table_identifier)
-        criteria = {
-            "namespace": namespace,
-            "table_name": table_name
-        }
+        # 1. Build the base WHERE clause and parameters
+        params = {}
+        where_clauses = []
 
-        total_count = self.storage_adapter.get_aggregate("COUNT", "*", criteria)
-        results = self.storage_adapter.get_by_attributes(criteria, limit=size)
+        if namespace != '*':
+            where_clauses.append('"namespace" = :namespace')
+            params['namespace'] = namespace
+
+        if table_name:
+            where_clauses.append('"table_name" = :table_name')
+            params['table_name'] = table_name
+
+        # 2. Add the condition for the 'results' column if showEmpty is False
+        if not showEmpty:
+            # This condition filters out both NULL and empty JSON arrays '[]'
+            where_clauses.append('"results" IS NOT NULL AND "results" != \'[]\'')
+
+        # 3. Assemble the final query components
+        where_sql = ""
+        if where_clauses:
+            where_sql = "WHERE " + " AND ".join(where_clauses)
+
+        # 4. Use a raw query for both count and results to ensure consistency
+        count_query = f'SELECT COUNT(*) as total FROM "{self.storage_adapter.table_name}" {where_sql}'
+        total_count_result = self.storage_adapter.execute_raw_select_query(count_query, params)
+        total_count = total_count_result[0]['total'] if total_count_result else 0
+
+        results_query = f'SELECT * FROM "{self.storage_adapter.table_name}" {where_sql} ORDER BY run_timestamp DESC LIMIT :limit'
+        params['limit'] = size
+        
+        results = self.storage_adapter.find_by_raw_query(results_query, params)
 
         return results
 
@@ -63,21 +88,21 @@ class InsightsRunner:
 
     def run_for_namespace(self, namespace: str, rule_ids: List[str] = None, recursive: bool = True, type: str = "manual") -> Dict[str, List[Insight]]:
         tables = self.lakeview.get_tables(namespace)
-        results = {}
+        results = []
         for t_ident in tables:
             qualified = qualified_table_name(t_ident)
-            results[qualified] = self.run_for_table(t_ident, rule_ids, type)
+            results.extend(self.run_for_table(qualified, rule_ids, type))
         if recursive:
             nested_namespaces = self.lakeview._get_nested_namespaces(namespace)
             for ns in nested_namespaces:
                 ns_str = ".".join(ns)
-                results.update(self.run_for_namespace(ns_str, rule_ids, recursive=False, type=type))
+                results.extend(self.run_for_namespace(ns_str, rule_ids, recursive=False, type=type))
         return results
 
     def run_for_lakehouse(self, rule_ids: List[str] = None, type: str = "manual") -> Dict[str, List[Insight]]:
         namespaces = self.lakeview.get_namespaces(include_nested=False)
-        results = {}
+        results = []
         for ns in namespaces:
             ns_str = ".".join(ns) if isinstance(ns, (tuple, list)) else str(ns)
-            results.update(self.run_for_namespace(ns_str, rule_ids, recursive=True, type=type))
+            results.extend(self.run_for_namespace(ns_str, rule_ids, recursive=True, type=type))
         return results
