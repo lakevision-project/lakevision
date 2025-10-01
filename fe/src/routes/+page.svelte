@@ -351,62 +351,64 @@
 			{:else if insightRuns.length === 0}
 				<p>No completed health check jobs found across the lakehouse.</p>
 			{:else}
-				<VirtualTable
-					data="{insightRuns}"
-					columns="{completedRunsColumns}"
-					bind:columnWidths="{completedRunsColWidths}"
-					disableVirtualization="{true}"
-					enableSearch="{true}"
-				>
-					<div slot="cell" let:row let:columnKey let:searchQuery>
-						{#if columnKey === 'Job Type'}
-							<Tag type="{row.run_type === 'manual' ? 'cyan' : 'green'}" title="{row.run_type}"
-								>{row.run_type}</Tag
-							>
-						{:else if columnKey === 'Timestamp'}
-							{@html highlightMatch(new Date(row.run_timestamp).toLocaleString(), searchQuery)}
-						{:else if columnKey === 'Rules & Results'}
-							{@const codesWithResults = new Set(row.results.map((r) => r.code))}
-							<div class="rules-cell-container">
-								{#each row.rules_requested as ruleId}
-									{@const hasResults = codesWithResults.has(ruleId)}
-									{@const compositeKey = `${row.id}-${ruleId}`}
-									{@const ruleResults = row.results.filter((r) => r.code === ruleId)}
-									<div
-										class="rule-item"
-										role="button"
-										tabindex="0"
-										on:click="{() => {
-											if (hasResults) {
-												expandedRules[compositeKey] = !expandedRules[compositeKey];
-											}
-										}}"
-									>
-										<div class="rule-item-header">
-											{#if hasResults}
-												<WarningAltFilled size="{16}" style="color: #ff832b;" />
-											{:else}
-												<CheckmarkFilled size="{16}" style="color: #24a148;" />
-											{/if}
-											<span>{@html highlightMatch(ruleIdToNameMap.get(ruleId) || ruleId, searchQuery)}</span>
-										</div>
-										{#if expandedRules[compositeKey]}
-											<div class="rule-details">
-												{#each ruleResults as result}
-													<div class="message-card">
-														<p><strong>Message:</strong> {@html highlightMatch(result.message, searchQuery)}</p>
-													</div>
-												{/each}
+				<div class="insights-virtual-table-container-lakehouse">
+					<VirtualTable
+						data="{insightRuns}"
+						columns="{completedRunsColumns}"
+						bind:columnWidths="{completedRunsColWidths}"
+						disableVirtualization="{true}"
+						enableSearch="{true}"
+					>
+						<div slot="cell" let:row let:columnKey let:searchQuery>
+							{#if columnKey === 'Job Type'}
+								<Tag type="{row.run_type === 'manual' ? 'cyan' : 'green'}" title="{row.run_type}"
+									>{row.run_type}</Tag
+								>
+							{:else if columnKey === 'Timestamp'}
+								{@html highlightMatch(new Date(row.run_timestamp).toLocaleString(), searchQuery)}
+							{:else if columnKey === 'Rules & Results'}
+								{@const codesWithResults = new Set(row.results.map((r) => r.code))}
+								<div class="rules-cell-container">
+									{#each row.rules_requested as ruleId}
+										{@const hasResults = codesWithResults.has(ruleId)}
+										{@const compositeKey = `${row.id}-${ruleId}`}
+										{@const ruleResults = row.results.filter((r) => r.code === ruleId)}
+										<div
+											class="rule-item"
+											role="button"
+											tabindex="0"
+											on:click="{() => {
+												if (hasResults) {
+													expandedRules[compositeKey] = !expandedRules[compositeKey];
+												}
+											}}"
+										>
+											<div class="rule-item-header">
+												{#if hasResults}
+													<WarningAltFilled size="{16}" style="color: #ff832b;" />
+												{:else}
+													<CheckmarkFilled size="{16}" style="color: #24a148;" />
+												{/if}
+												<span>{@html highlightMatch(ruleIdToNameMap.get(ruleId) || ruleId, searchQuery)}</span>
 											</div>
-										{/if}
-									</div>
-								{/each}
-							</div>
-						{:else}
-							{@html highlightMatch(row[columnKey.toLowerCase().replace(' ', '_')], searchQuery)}
-						{/if}
-					</div>
-				</VirtualTable>
+											{#if expandedRules[compositeKey]}
+												<div class="rule-details">
+													{#each ruleResults as result}
+														<div class="message-card">
+															<p><strong>Message:</strong> {@html highlightMatch(result.message, searchQuery)}</p>
+														</div>
+													{/each}
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							{:else}
+								{@html highlightMatch(row[columnKey.toLowerCase().replace(' ', '_')], searchQuery)}
+							{/if}
+						</div>
+					</VirtualTable>
+				</div>
 			{/if}
 		{:else if insightsSubTab === 1}
 			{#if runningJobsLoading}
@@ -601,4 +603,16 @@
     .dropdown-control .bx--label {
         margin-bottom: 0.5rem;
     }
+
+	.insights-virtual-table-container-lakehouse :global(.cell:nth-child(1)),
+	.insights-virtual-table-container-lakehouse :global(.cell:nth-child(2)),
+	.insights-virtual-table-container-lakehouse :global(.cell:nth-child(3)),
+	.insights-virtual-table-container-lakehouse :global(.cell:nth-child(4)) {
+		align-items: center !important; /* Vertically center */
+		justify-content: center; /* Horizontally center */
+	}
+	.insights-virtual-table-container-lakehouse :global(.cell:nth-child(5)) {
+		align-items: flex-start !important;
+		padding: 0 !important;
+	}
 </style>
