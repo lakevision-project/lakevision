@@ -6,6 +6,7 @@ from app.insights.runner import InsightsRunner
 from app.models import InsightRun
 from app.models import JobSchedule
 from app.storage import get_storage, StorageInterface
+import logging
 
 def execute_job(schedule: JobSchedule, storage: StorageInterface):
     """
@@ -69,9 +70,12 @@ if __name__ == "__main__":
     # In production, you'd use a real daemon or a cron job to run it.
     print("Starting scheduler process")
     while True:
-        print("Checking schedules to run")
-        schedule_storage = get_storage(model=JobSchedule)
-        schedule_storage.connect()
-        schedule_storage.ensure_table()
-        run_scheduler_cycle(schedule_storage)
-        time.sleep(60) # Wait for 60 seconds
+        try:
+            print("Checking schedules to run")
+            schedule_storage = get_storage(model=JobSchedule)
+            schedule_storage.connect()
+            schedule_storage.ensure_table()
+            run_scheduler_cycle(schedule_storage)
+            time.sleep(60) # Wait for 60 seconds
+        except Exception as e:
+            logging.error(f"Error running scheduler: {str(e)}")

@@ -214,36 +214,37 @@ def rule_skewed_or_largest_partitions_table(table: Table) -> Optional[Insight]:
                 partition_summary[partition_key]["size_bytes"] += file.size_bytes
 
             partition_list = []
-            for partition_key, summary_values in partition_summary.items():
-                partition_list.append({
-                    "partition_key": partition_key,
-                    "records": summary_values["records"],
-                    "size_bytes": summary_values["size_bytes"]
-                })
+            if len(partition_list)>0:
+                for partition_key, summary_values in partition_summary.items():
+                    partition_list.append({
+                        "partition_key": partition_key,
+                        "records": summary_values["records"],
+                        "size_bytes": summary_values["size_bytes"]
+                    })
 
-            partitions_size = len(partition_summary)
-            records_by_partition = [v["records"] for v in partition_summary.values()]
-            size_by_partition = [v["size_bytes"] for v in partition_summary.values()]
-            median_records = median(records_by_partition)
-            median_size = median(size_by_partition)
-            # Condition that checks for a significant positive skew in the data. It evaluates to True if the largest value in your dataset is more than X times greater than the median value.
-            skewed_records = max(records_by_partition)/median_records > SKEWED_PARTITION_THRESHOLD_RATIO
-            skewed_size = max(size_by_partition)/median_size > SKEWED_PARTITION_THRESHOLD_RATIO
+                partitions_size = len(partition_summary)
+                records_by_partition = [v["records"] for v in partition_summary.values()]
+                size_by_partition = [v["size_bytes"] for v in partition_summary.values()]
+                median_records = median(records_by_partition)
+                median_size = median(size_by_partition)
+                # Condition that checks for a significant positive skew in the data. It evaluates to True if the largest value in your dataset is more than X times greater than the median value.
+                skewed_records = max(records_by_partition)/median_records > SKEWED_PARTITION_THRESHOLD_RATIO
+                skewed_size = max(size_by_partition)/median_size > SKEWED_PARTITION_THRESHOLD_RATIO
 
-            largest_records = max(records_by_partition)
-            largest_size = max(size_by_partition)
-      
-            meta = INSIGHT_META["SKEWED_OR_LARGEST_PARTITIONS_TABLE"]
-            if skewed_records or skewed_size:
-                return Insight(
-                    code="SKEWED_OR_LARGEST_PARTITIONS_TABLE",
-                    table=qualified_table_name(table.name()),
-                    message=meta["message"].format(partitions=int(partitions_size), skew_ratio=int(SKEWED_PARTITION_THRESHOLD_RATIO), 
-                                                median_size=int(median_size), largest_size=str(largest_size),
-                                                median_records=int(median_records), largest_records=str(largest_records)),
-                    severity=meta["severity"],
-                    suggested_action=meta["suggested_action"]
-                )
+                largest_records = max(records_by_partition)
+                largest_size = max(size_by_partition)
+        
+                meta = INSIGHT_META["SKEWED_OR_LARGEST_PARTITIONS_TABLE"]
+                if skewed_records or skewed_size:
+                    return Insight(
+                        code="SKEWED_OR_LARGEST_PARTITIONS_TABLE",
+                        table=qualified_table_name(table.name()),
+                        message=meta["message"].format(partitions=int(partitions_size), skew_ratio=int(SKEWED_PARTITION_THRESHOLD_RATIO), 
+                                                    median_size=int(median_size), largest_size=str(largest_size),
+                                                    median_records=int(median_records), largest_records=str(largest_records)),
+                        severity=meta["severity"],
+                        suggested_action=meta["suggested_action"]
+                    )
 
         except Exception as e:
             print(str(e))
