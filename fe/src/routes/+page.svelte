@@ -428,6 +428,10 @@
 							<Tag type="blue">{row.status}</Tag>
 						{:else if columnKey === 'Started At'}
 							{@html highlightMatch(row.started_at ? new Date(row.started_at).toLocaleString() : 'N/A', searchQuery)}
+						{:else if columnKey === 'Job ID'}
+							{@html highlightMatch(row.run_id, searchQuery)}
+						{:else if columnKey === 'Table Name'}
+							{@html highlightMatch(row.table_name ? row.table_name: '-', searchQuery)}
 						{:else}
 							{@html highlightMatch(row[columnKey.toLowerCase().replace(/ /g, '_')], searchQuery)}
 						{/if}

@@ -37,6 +37,8 @@ class BackgroundJob:
 class StatusResponse(BaseModel):
     run_id: str
     status: Literal["pending", "running", "complete", "failed"]
+    table_name: str | None = None
+    namespace: str
     details: str | None = None
     rules_requested: List[str]
     started_at: datetime | None = None
