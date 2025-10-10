@@ -111,8 +111,13 @@
 </script>
 
 <Header company="{company}" platformName="{platform}">
-	<HeaderNavItem href="/" text="Home" />
-	<HeaderNavItem href="/table-view" text="Tables" />
+	<HeaderNavItem href="/" text="Tables" />
+	<HeaderNavItem href="/lh-health" text="Lakehouse Health" />
+	
+	{#if CHAT_ENABLED}
+		<HeaderNavItem text="Chat" on:click="{() => (chatpop = true)}" />
+	{/if}
+
 
 	<HeaderUtilities>
 		<HeaderActionLink href="https://github.com/IBM/lakevision" target="_blank">
@@ -126,12 +131,8 @@
 				on:click="{(event) => handleLogout(event)}"
 			/>
 		{/if}
-		{#if extra_link || CHAT_ENABLED}
+		{#if extra_link}
 			<HeaderAction bind:isOpen="{isHeaderActionOpen}">
-				<HeaderPanelLinks>
-					<HeaderPanelLink text="Chat" on:click="{() => (chatpop = true)}"></HeaderPanelLink>
-				</HeaderPanelLinks>
-				<HeaderPanelDivider></HeaderPanelDivider>
 				<HeaderPanelLinks>
 					<HeaderPanelLink
 						text="{extra_link_text}"
