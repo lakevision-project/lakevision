@@ -1,8 +1,8 @@
 import os
 from typing import Optional, Type
 
-from .interface import StorageInterface, T
-from .sqlalchemy_adapter import SQLAlchemyStorage
+from app.storage.interface import StorageInterface, T
+from app.storage.sqlalchemy_adapter import SQLAlchemyStorage
 
 def get_storage(
     model: Type[T],
