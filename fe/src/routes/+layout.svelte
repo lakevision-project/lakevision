@@ -3,8 +3,7 @@
 	import { browser } from '$app/environment';
 	import 'carbon-components-svelte/css/all.css';
 	import '../app.css';
-
-	// HeaderNavigation import has been removed
+	import { page } from '$app/stores';
 	import {
 		Header,
 		HeaderUtilities,
@@ -19,8 +18,8 @@
 	} from 'carbon-components-svelte';
 
 	import LogoGithub from 'carbon-icons-svelte/lib/LogoGithub.svelte';
-	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
+	import { onMount, tick } from 'svelte';
+	import { goto, afterNavigate } from '$app/navigation';
 	import { Logout, UserAvatarFilledAlt } from 'carbon-icons-svelte';
 	import Chat from '../lib/components/Chat.svelte';
 
@@ -34,6 +33,40 @@
 	let extra_link_text;
 	let company = 'Apache Iceberg';
 	let platform = 'Lakevision';
+
+	let isChatOpen = false;
+	let ignoreUrlSync = false; // guard to prevent re-opening during our own updates
+
+	// initialize from current URL once on mount
+	onMount(() => {
+		isChatOpen = $page.url.searchParams.get('openChat') === 'true';
+	});
+
+	// only sync when navigation finishes (URL actually changed)
+	afterNavigate(() => {
+		if (ignoreUrlSync) return; // skip if change initiated by setChatOpen
+		isChatOpen = $page.url.searchParams.get('openChat') === 'true';
+	});
+
+	async function setChatOpen(open) {
+		if (!browser) return;
+		// immediately reflect in UI
+		isChatOpen = open;
+
+		// update URL without adding history entries
+		const sp = new URLSearchParams($page.url.searchParams);
+		open ? sp.set('openChat', 'true') : sp.delete('openChat');
+		const qs = sp.toString();
+
+		ignoreUrlSync = true;
+		await goto(qs ? `?${qs}` : $page.url.pathname, { replaceState: true, noScroll: true });
+		await tick();               // let Svelte flush
+		ignoreUrlSync = false;      // re-enable URL → state syncing
+	}
+
+	const handleChatClose = () => setChatOpen(false);
+	const handleChatOpen  = () => setChatOpen(true);
+
 
 	onMount(() => {
 		if (env.PUBLIC_AUTH_ENABLED == 'true') {
@@ -73,7 +106,10 @@
 			const data = await response.json();
 			console.log('Token received:', data);
 			user = data;
-			goto('/');
+
+			// Decode the state parameter and redirect, preserving the original URL query
+			const decodedState = decodeURIComponent(state || '');
+			goto('/?' + decodedState);
 		} else {
 			console.error('Error exchanging token');
 		}
@@ -115,7 +151,7 @@
 	<HeaderNavItem href="/lh-health" text="Lakehouse Health" />
 	
 	{#if CHAT_ENABLED}
-		<HeaderNavItem text="Chat" on:click="{() => (chatpop = true)}" />
+		<HeaderNavItem text="Chat" href="?openChat=true" />
 	{/if}
 
 
@@ -154,7 +190,14 @@
 	on:submit="{login}"
 />
 
-<Modal passiveModal bind:open="{chatpop}" modalHeading="Chat with your Datasets">
+<Modal
+	passiveModal
+	bind:open={isChatOpen}
+	modalHeading="Chat with your Datasets"
+	on:open={handleChatOpen}
+	on:close={handleChatClose}
+	on:click:overlay={handleChatClose}
+>
 	{#if user}
 		<Chat {user} />
 	{/if}
