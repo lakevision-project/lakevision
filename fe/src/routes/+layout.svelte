@@ -13,7 +13,6 @@
 		HeaderGlobalAction,
 		HeaderPanelLink,
 		HeaderAction,
-		HeaderPanelDivider,
 		Modal
 	} from 'carbon-components-svelte';
 
@@ -26,9 +25,9 @@
 	export let data;
 	let user;
 	let isHeaderActionOpen = false;
-	let chatpop = false;
 	let AUTH_ENABLED = false;
 	let CHAT_ENABLED = false;
+	let CHAT_NAME = 'Chat';
 	let extra_link;
 	let extra_link_text;
 	let company = 'Apache Iceberg';
@@ -73,6 +72,9 @@
 			AUTH_ENABLED = true;
 		}
 		if (env.PUBLIC_CHAT_ENABLED == 'true') {
+			if (env.PUBLIC_CHAT_NAME) {
+				CHAT_NAME = env.PUBLIC_CHAT_NAME;
+			}
 			CHAT_ENABLED = true;
 		}
 		if (env.PUBLIC_EXTRA_LINK) {
@@ -151,7 +153,7 @@
 	<HeaderNavItem href="/lh-health" text="Lakehouse Health" />
 	
 	{#if CHAT_ENABLED}
-		<HeaderNavItem text="Chat" href="?openChat=true" />
+		<HeaderNavItem text="{CHAT_NAME}" href="?openChat=true" />
 	{/if}
 
 
