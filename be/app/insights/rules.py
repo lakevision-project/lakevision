@@ -214,7 +214,7 @@ def rule_skewed_or_largest_partitions_table(table: Table) -> Optional[Insight]:
                 partition_summary[partition_key]["size_bytes"] += file.size_bytes
 
             partition_list = []
-            if len(partition_list)>0:
+            if len(partition_summary)>0:
                 for partition_key, summary_values in partition_summary.items():
                     partition_list.append({
                         "partition_key": partition_key,
