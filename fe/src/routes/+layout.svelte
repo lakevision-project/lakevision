@@ -149,7 +149,7 @@
 </script>
 
 <Header company="{company}" platformName="{platform}">
-	<HeaderNavItem href="/" text="Tables" />
+	<HeaderNavItem href="/" text="Home" />
 	<HeaderNavItem href="/lh-health" text="Lakehouse Health" />
 	
 	{#if CHAT_ENABLED}
@@ -193,9 +193,10 @@
 />
 
 <Modal
+	size='lg'
 	passiveModal
 	bind:open={isChatOpen}
-	modalHeading="Chat with your Datasets"
+	modalHeading="{CHAT_NAME} - Chat with your Lakehouse"
 	on:open={handleChatOpen}
 	on:close={handleChatClose}
 	on:click:overlay={handleChatClose}
