@@ -7,7 +7,7 @@ from fastapi import Request, HTTPException
 from pyiceberg.table import Table
 from app.lakeviewer import LakeView
 from app.storage import get_storage
-from app.models import BackgroundJob, InsightRun, JobSchedule
+from app.models import BackgroundJob, InsightRun, JobSchedule, InsightRecord, ActiveInsight
 from app import config
 from app.insights.runner import InsightsRunner
 
@@ -21,18 +21,27 @@ def get_runner():
     """
     # 1. Create the storage instance
     storage = get_storage(model=InsightRun)
+    insights_storage = get_storage(model=InsightRecord)
+    active_insights_storage = get_storage(model=ActiveInsight)
     try:
         # 2. Connect to the database
         storage.connect()
         storage.ensure_table()
+        insights_storage.connect()
+        insights_storage.ensure_table()
+        active_insights_storage.connect()
+        active_insights_storage.ensure_table()
         # 3. Create the runner with its dependencies
-        runner = InsightsRunner(lakeview=lv, storage_adapter=storage)
+        runner = InsightsRunner(lakeview=lv, run_storage=storage, insight_storage=insights_storage, active_insight_storage=active_insights_storage)
         # 4. Yield the runner to the endpoint function
         yield runner
     finally:
         # 5. This code runs after the response is sent, ensuring
         #    the connection is always closed.
         storage.disconnect()
+        insights_storage.disconnect()
+        active_insights_storage.disconnect()
+
 
 # --- Authorization ---
 authz_module = importlib.import_module(config.AUTHZ_MODULE)

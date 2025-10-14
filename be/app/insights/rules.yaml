@@ -25,7 +25,7 @@ NO_ROWS_TABLE:
 SNAPSHOT_SPRAWL_TABLE:
   severity: Warning
   message: "Table with a large number of snapshots: {snapshots} (over {max_snapshots_recommended}) , which may affect table load and metadata performance."
-  suggested_action: "Suggested action: Expire or tag old snapshots to improve performance"
+  suggested_action: "Expire or tag old snapshots to improve performance"
 SKEWED_OR_LARGEST_PARTITIONS_TABLE:
   severity: Info
   message: "This table has {partitions} partitions. The largest partition is much bigger than the typical one. Median partition size: {median_size} bytes, largest partition: {largest_size} bytes. Median records: {median_records}, largest partition: {largest_records} records."

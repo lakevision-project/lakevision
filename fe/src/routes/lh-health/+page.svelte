@@ -32,6 +32,9 @@
 	let runningJobs = [];
 	let schedulesLoading = true;
 	let scheduledJobs = [];
+	let overviewLoading = true;
+    let overviewData = [];
+    let expandedOccurrences = {};
 
 	// --- State for rule names and expanding results ---
 	let allRules = [];
@@ -82,6 +85,19 @@
 	let runModalSelectedNsId = '*';
 	let scheduleModalSelectedNsId = '*';
 
+	const overviewColumns = {
+        Rule: '',
+        Namespace: '',
+        'Suggested Action': '',
+        'Affected Tables': ''
+    };
+    let overviewColWidths = {
+        Rule: 200,
+        Namespace: 150,
+        'Suggested Action': 400,
+        'Affected Tables': 700
+    };
+
 	// MODIFIED: Reactive logic to translate selected ID to the correct name for the API payload
 	$: {
 		const selectedRunNs = dropdownNamespaces.find(ns => ns.id === runModalSelectedNsId);
@@ -125,7 +141,7 @@
 		'Job Type': '', Namespace: '', 'Table Name': '', Timestamp: '', 'Rules & Results': ''
 	};
 	let completedRunsColWidths = {
-		'Job Type': 120, Namespace: 150, 'Table Name': 200, Timestamp: 220, 'Rules & Results': 600
+		'Job Type': 120, Namespace: 150, 'Table Name': 200, Timestamp: 220, 'Rules & Results': 700
 	};
 	const runningJobsColumns = {
 		'Job ID': '', Namespace: '', 'Table Name': '', Status: '', 'Started At': ''
@@ -142,6 +158,7 @@
 
 	// --- Data Fetching ---
 	onMount(() => {
+		fetchOverviewData();
 		fetchRunningJobs();
 		fetchSchedules();
 		if (allRules.length === 0) fetchAllRules();
@@ -155,6 +172,39 @@
 			fetchLatestInsights();
 		}
 	}
+
+	async function fetchOverviewData() {
+        overviewLoading = true;
+        try {
+            const response = await fetch(`/api/namespaces/*/insights/summary`);
+            if (!response.ok) throw new Error('Failed to fetch overview summary');
+            
+            const rawData = await response.json();
+
+            overviewData = rawData.map(item => ({
+                ...item,
+                id: `${item.code}-${item.namespace}` 
+            }));
+
+            // --- START: ADDED CODE ---
+            // Pre-populate the expanded state for the Overview tab
+            let newExpandedOccurrences = {};
+            overviewData.forEach(row => {
+                row.occurrences.forEach((occurrence, i) => {
+                    const compositeKey = `${row.code}-${occurrence.table_name}-${i}`;
+                    newExpandedOccurrences[compositeKey] = true;
+                });
+            });
+            expandedOccurrences = newExpandedOccurrences;
+            // --- END: ADDED CODE ---
+
+        } catch (error) {
+            console.error('Error fetching overview summary:', error);
+            overviewData = [];
+        } finally {
+            overviewLoading = false;
+        }
+    }
 
 	async function fetchLatestInsights() {
 		insights_loading = true;
@@ -321,17 +371,82 @@
 				scheduleModalSelectedNsId = '*'; // Set default ID
 				openScheduleModal = true;
 			}}">Schedule Health Check</Button>
-			<Button kind="ghost" class="cds--btn--icon-only" icon="{Renew}" iconDescription="Refresh All Data" on:click="{() => { fetchLatestInsights(); fetchRunningJobs(); fetchSchedules(); }}"/>
+			<Button kind="ghost" class="cds--btn--icon-only" icon="{Renew}" iconDescription="Refresh All Data" on:click="{() => { fetchOverviewData();fetchLatestInsights(); fetchRunningJobs(); fetchSchedules(); }}"/>
 		</ButtonSet>
 	</div>
 
 	<Tabs bind:selected="{insightsSubTab}" style="margin-top: 1rem;">
+		<Tab label="Overview" />
 		<Tab label="Completed Jobs" />
 		<Tab label="In-Progress Jobs" />
 		<Tab label="Scheduled Jobs" />
 	</Tabs>
 	<div class="tab-content-container">
 		{#if insightsSubTab === 0}
+            {#if overviewLoading}
+                <DataTableSkeleton rowCount="{5}" columnCount="{4}" />
+            {:else if overviewData.length === 0}
+                <p>No active insights found across the lakehouse. Great job!</p>
+            {:else}
+                <div class="insights-virtual-table-container-lakehouse">
+                    <VirtualTable
+                        data="{overviewData}"
+                        columns="{overviewColumns}"
+                        bind:columnWidths="{overviewColWidths}"
+                        disableVirtualization="{true}"
+                        enableSearch="{true}"
+                    >
+                        <div slot="cell" let:row let:columnKey let:searchQuery>
+                            {#if columnKey === 'Rule'}
+                                {@html highlightMatch(ruleIdToNameMap.get(row.code) || row.code, searchQuery)}
+                            {:else if columnKey === 'Affected Tables'}
+                                <div class="rules-cell-container">
+                                    {#each row.occurrences as occurrence, i}
+                                        {@const compositeKey = `${row.code}-${occurrence.table_name}-${i}`}
+                                        <div
+                                            class="rule-item"
+                                            role="button"
+                                            tabindex="0"
+                                            on:click="{() => {
+                                                expandedOccurrences[compositeKey] = !expandedOccurrences[compositeKey];
+                                            }}"
+                                        >
+                                            <div class="rule-item-header">
+                                                {#if occurrence.severity.toLowerCase() === 'warning'}
+                                                    <WarningAltFilled size="{16}" style="color: var(--cds-support-03, #ff832b);" />
+                                                {:else if occurrence.severity.toLowerCase() === 'critical'}
+                                                    <WarningAltFilled size="{16}" style="color: var(--cds-support-02, #24a148);" />
+                                                {:else}
+                                                    <Information size="{16}" style="color: #0f62fe;" />
+                                                {/if}
+                                                <span>{@html highlightMatch(occurrence.table_name, searchQuery)}</span>
+                                            </div>
+
+                                            {#if expandedOccurrences[compositeKey]}
+                                                <div class="rule-details">
+                                                    <div class="message-card">
+                                                        <p>
+                                                            <strong>Message:</strong>
+                                                            {@html highlightMatch(occurrence.message, searchQuery)}
+                                                        </p>
+                                                        <p>
+                                                            <strong>Timestamp:</strong>
+                                                            {new Date(occurrence.timestamp).toLocaleString()}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            {/if}
+                                        </div>
+                                    {/each}
+                                </div>
+                            {:else}
+                                {@html highlightMatch(row[columnKey.toLowerCase().replace(/ /g, '_')], searchQuery)}
+                            {/if}
+                        </div>
+                    </VirtualTable>
+                </div>
+            {/if}
+		{:else if insightsSubTab === 1}
 			<div class="controls-container">
 				<div class="control-item">
 					<Toggle labelText="Show tables with no warnings" bind:toggled="{showEmptyResults}" />
@@ -385,9 +500,9 @@
 										>
 											<div class="rule-item-header">
 												{#if hasResults}
-													<WarningAltFilled size="{16}" style="color: #ff832b;" />
+													<WarningAltFilled size="{16}" style="color: var(--cds-support-03, #ff832b);" />
 												{:else}
-													<CheckmarkFilled size="{16}" style="color: #24a148;" />
+													<CheckmarkFilled size="{16}" style="color: var(--cds-support-02, #24a148);" />
 												{/if}
 												<span>{@html highlightMatch(ruleIdToNameMap.get(ruleId) || ruleId, searchQuery)}</span>
 											</div>
@@ -410,7 +525,7 @@
 					</VirtualTable>
 				</div>
 			{/if}
-		{:else if insightsSubTab === 1}
+		{:else if insightsSubTab === 2}
 			{#if runningJobsLoading}
 				<DataTableSkeleton rowCount="{3}" columnCount="{5}" />
 			{:else if runningJobs.length === 0}
@@ -438,7 +553,7 @@
 					</div>
 				</VirtualTable>
 			{/if}
-		{:else if insightsSubTab === 2}
+		{:else if insightsSubTab === 3}
 			{#if schedulesLoading}
 				<DataTableSkeleton rowCount="{3}" columnCount="{6}" />
 			{:else if scheduledJobs.length === 0}
@@ -590,7 +705,6 @@
     .rules-cell-container { display: flex; flex-direction: column; gap: 0.5rem; padding: 8px; width: 100%; }
     .rule-item-header { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
     .rule-details { margin-top: 0.5rem; padding-left: 24px; display: flex; flex-direction: column; gap: 0.75rem; }
-    .message-card { background-color: #f4f4f4; border-left: 3px solid #ff832b; padding: 0.5rem 1rem; border-radius: 4px; }
     .message-card p { margin: 0.2rem 0; font-size: 13px; }
     .rules-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem 1rem; }
     .modal-divider { margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0; }
@@ -608,15 +722,26 @@
         margin-bottom: 0.5rem;
     }
 
-	.insights-virtual-table-container-lakehouse :global(.cell:nth-child(1)),
-	.insights-virtual-table-container-lakehouse :global(.cell:nth-child(2)),
-	.insights-virtual-table-container-lakehouse :global(.cell:nth-child(3)),
-	.insights-virtual-table-container-lakehouse :global(.cell:nth-child(4)) {
-		align-items: center !important; /* Vertically center */
-		justify-content: center; /* Horizontally center */
-	}
-	.insights-virtual-table-container-lakehouse :global(.cell:nth-child(5)) {
-		align-items: flex-start !important;
-		padding: 0 !important;
-	}
+    /* Style all columns EXCEPT the last one */
+    .insights-virtual-table-container-lakehouse :global(.cell:not(:last-child)) {
+        align-items: center !important; /* Vertically center */
+        justify-content: center; /* Horizontally center */
+    }
+
+    /* Style ONLY the last column, regardless of whether it's the 4th or 5th */
+    .insights-virtual-table-container-lakehouse :global(.cell:last-child) {
+        align-items: flex-start !important;
+        padding: 0 !important;
+    }
+
+	.insights-virtual-table-container-lakehouse :global(.cell:nth-child(3)) {
+        white-space: normal; /* Allows the text to wrap */
+        word-break: break-word; /* Breaks long words if necessary */
+        justify-content: flex-start !important; /* Aligns content to the left */
+        padding: 8px !important; /* Adds some breathing room */
+    }
+
+	.insights-virtual-table-container-lakehouse :global(.header-cell) {
+        justify-content: center !important;
+    }
 </style>

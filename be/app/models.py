@@ -31,7 +31,7 @@ class BackgroundJob:
     details: Optional[str] = None
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
-    results: Optional[List[Dict[str, Any]]] = None
+    results: Optional[List[Dict[str, Any]]] = None # This can be populated on retrieval
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 class StatusResponse(BaseModel):
@@ -47,7 +47,6 @@ class StatusResponse(BaseModel):
 
     @classmethod
     def from_job(cls, job: BackgroundJob) -> "StatusResponse":
-        """Creates a StatusResponse instance from a BackgroundJob dataclass."""
         from dateutil.parser import parse
         job_dict = dataclasses.asdict(job)
         job_dict['run_id'] = job_dict.pop('id')
@@ -57,7 +56,6 @@ class StatusResponse(BaseModel):
             job_dict['finished_at'] = parse(job_dict['finished_at'])
         return cls(**job_dict)
 
-# --- Scheduling ---
 class JobScheduleUpdateRequest(BaseModel):
     namespace: Optional[str] = None
     table_name: Optional[str] = None
@@ -79,28 +77,18 @@ class JobScheduleResponse(JobScheduleRequest):
     last_run_timestamp: Optional[datetime] = None
     created_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-
 @dataclass
 class JobSchedule:
-    """
-    Defines a scheduled job for running insights.
-    This maps directly to a 'jobschedules' table in your DB.
-    """
-
     namespace: str
-    table_name: Optional[str] # NULL if it's a namespace-level job
+    table_name: Optional[str]
     rules_requested: List[str]
-
-    cron_schedule: str # e.g., "0 * * * *" (every hour at minute 0)
-
+    cron_schedule: str
     next_run_timestamp: datetime
-
-    created_by: str # e.g., user email
+    created_by: str
     last_run_timestamp: Optional[datetime] = None
     created_timestamp: datetime = field(default_factory=datetime.utcnow)
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     is_enabled: bool = True
-
 
 @dataclass
 class Rule:
@@ -109,15 +97,12 @@ class Rule:
     description: str
     method: Any
 
-
 class RuleOut(BaseModel):
     id: str
     name: str
     description: str
-
     class Config:
         from_attributes = True
-
 
 @dataclass
 class Insight:
@@ -127,6 +112,16 @@ class Insight:
     severity: str
     suggested_action: str
 
+@dataclass
+class InsightRecord:
+    run_id: str
+    code: str
+    table: str
+    message: str
+    severity: str
+    suggested_action: str
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 @dataclass
 class InsightRun:
@@ -134,15 +129,49 @@ class InsightRun:
     table_name: str
     rules_requested: List[str]
     run_type: Literal['manual', 'auto']
-    results: List[Insight]
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     run_timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
+class InsightRunOut(BaseModel):
+    id: str
+    namespace: str
+    table_name: str
+    rules_requested: List[str]
+    run_type: Literal['manual', 'auto']
+    run_timestamp: datetime
+    results: List[InsightRecord]
+
+    class Config:
+        from_attributes = True
+
+@dataclass
+class ActiveInsight:
+    table_name: str
+    code: str
+
+    namespace: str
+    severity: str
+    message: str
+    suggested_action: str
+    
+    last_seen_run_id: str
+    last_seen_timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+class InsightOccurrence(BaseModel):
+    table_name: str
+    severity: str
+    message: str
+    timestamp: datetime
+
+class RuleSummaryOut(BaseModel):
+    code: str
+    namespace: str
+    suggested_action: str
+    occurrences: List[InsightOccurrence]
 
 class ColumnFilter(BaseModel):
     name: str
     value: str
-
 
 class TableFile(BaseModel):
     path: str

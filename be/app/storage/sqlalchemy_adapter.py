@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional, Type, Union, get_args, get_origin
 
 from sqlalchemy import (TIMESTAMP, Boolean, Column, Float, Integer, MetaData,
                           String, Table, Text, create_engine, inspect, text, bindparam)
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 
 from app.storage.interface import AggregateFunction, StorageInterface, T
@@ -425,3 +427,52 @@ class SQLAlchemyStorage(StorageInterface[T]):
         with engine.begin() as conn:
             stmt = text(f'DELETE FROM "{self.table_name}" WHERE id = :id')
             conn.execute(stmt, {"id": item_id})
+    
+    def delete_by_attributes(self, criteria: dict[str, Any]) -> int:
+        """
+        Deletes records from the database that match all specified criteria.
+        Supports IN clauses for list values.
+
+        Args:
+            criteria: A dictionary of attribute-value pairs for the WHERE clause.
+
+        Returns:
+            The number of rows deleted.
+        """
+        # A critical safety check to prevent accidentally deleting all rows.
+        if not criteria:
+            raise ValueError("delete_by_attributes requires at least one criterion to prevent accidental table truncation.")
+
+        # This logic is adapted from your get_by_attributes method for consistency.
+        params = {}
+        clauses = []
+        for attr, value in criteria.items():
+            if attr not in self._field_names:
+                raise ValueError(f"'{attr}' is not a valid field in {self.model.__name__}")
+
+            if isinstance(value, list):
+                if not value:
+                    clauses.append("1=0") # No rows will match if the list is empty
+                    continue
+                # Use an expanding parameter for a clean 'IN' clause
+                clauses.append(f'"{attr}" IN :_{attr}')
+                params[f'_{attr}'] = value
+            elif value is None:
+                clauses.append(f'"{attr}" IS NULL')
+            else:
+                clauses.append(f'"{attr}" = :{attr}')
+                params[attr] = json.dumps(value) if attr in self._complex_fields else value
+
+        where_clause = "WHERE " + " AND ".join(clauses)
+        sql_query = f'DELETE FROM "{self.table_name}" {where_clause}'
+
+        # Prepare the statement with support for expanding IN clauses
+        stmt = text(sql_query)
+        expanding_params = [f'_{attr}' for attr, value in criteria.items() if isinstance(value, list)]
+        if expanding_params:
+            stmt = stmt.bindparams(*[bindparam(key, expanding=True) for key in expanding_params])
+
+        engine = self._get_engine()
+        with engine.begin() as conn:
+            result = conn.execute(stmt, params)
+            return result.rowcount # rowcount returns the number of deleted rows

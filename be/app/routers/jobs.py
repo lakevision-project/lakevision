@@ -11,7 +11,8 @@ from app.models import JobSchedule
 from app.storage import get_storage
 from app.models import (
     RunRequest, RunResponse, StatusResponse, BackgroundJob, InsightRun, 
-    JobScheduleRequest, JobScheduleResponse, JobScheduleUpdateRequest
+    JobScheduleRequest, JobScheduleResponse, JobScheduleUpdateRequest,
+    InsightRecord, ActiveInsight
 )
 
 router = APIRouter()
@@ -30,10 +31,16 @@ def run_insights_job(run_id: str, namespace: str, table_name: str | None, rules:
     background_job_storage.save(job)
     print(job.details)
     run_storage = get_storage(model=InsightRun)
+    insights_storage = get_storage(model=InsightRecord)
+    active_insights_storage = get_storage(model=ActiveInsight)
     try:
         run_storage.connect()
+        insights_storage.connect()
+        active_insights_storage.connect()
         run_storage.ensure_table()
-        runner = InsightsRunner(lv, run_storage)
+        insights_storage.ensure_table()
+        active_insights_storage.ensure_table()
+        runner = InsightsRunner(lv, run_storage, insights_storage, active_insights_storage)
         if namespace=="*":
             results = runner.run_for_lakehouse(rule_ids=rules)
         elif table_name:
@@ -61,6 +68,8 @@ def run_insights_job(run_id: str, namespace: str, table_name: str | None, rules:
         print(f"Job {run_id} failed: {e}")
     finally:
         run_storage.disconnect()
+        active_insights_storage.disconnect()
+        insights_storage.disconnect()
 
 # --- Manual Job Endpoints ---
 @router.post("/api/start-run", response_model=RunResponse, status_code=202)

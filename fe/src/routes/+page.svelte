@@ -1647,41 +1647,7 @@
 		border: none;
 		border-top: 1px solid #f4f4f4;
 	}
-	.rules-cell-container {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		padding: 8px;
-		width: 100%;
-	}
-	.rule-item {
-		padding: 4px;
-		border-radius: 4px;
-		transition: background-color 0.2s;
-	}
-	.rule-item-header {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		cursor: pointer;
-	}
-	.rule-details {
-		margin-top: 0.5rem;
-		padding-left: 24px;
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-	.message-card {
-		background-color: var(--cds-background, #f4f4f4);
-		border-left: 3px solid var(--cds-support-03, #ff832b);
-		padding: 0.5rem 1rem;
-		border-radius: 4px;
-	}
-	.message-card p {
-		margin: 0.2rem 0;
-		font-size: 13px;
-	}
+	
 	.running-jobs-section {
 		margin-bottom: 2rem;
 	}
