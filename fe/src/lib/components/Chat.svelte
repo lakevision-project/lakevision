@@ -358,7 +358,7 @@
 <div class="chat-container">
     <div class="status">{status}</div>
     <div class="details">
-        <p>You can find out information about you lakehouse like:</p>
+        <p>You can find out information about you Lakehouse:</p>
         <ul>
             <li>List namespaces</li>
             <li>List tables in namespace X</li>
