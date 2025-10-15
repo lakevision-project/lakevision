@@ -1,12 +1,38 @@
 <script>
     import { onMount, afterUpdate } from 'svelte';
-    import { TextInput, Button, Tag } from 'carbon-components-svelte';
+    import { TextArea, Button, Loading } from 'carbon-components-svelte';
     import Send from 'carbon-icons-svelte/lib/Send.svelte';
     import TrashCan from 'carbon-icons-svelte/lib/TrashCan.svelte';
-    import IbmGranite from 'carbon-icons-svelte/lib/IbmGranite.svelte';
     import { env } from '$env/dynamic/public';
     import { marked } from 'marked';
     import DOMPurify from 'dompurify';
+    import { BarChartSimple, LineChart, LollipopChart, AreaChart } from '@carbon/charts-svelte'
+
+    /**
+	 * @type {any}
+	 */    
+    let ChartComponents = {};
+    
+    onMount(async () => {        
+        user = user.split('@')[0];
+        if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
+            console.error('marked or DOMPurify not loaded');
+            status = 'Error: Markdown renderer or sanitizer not loaded. Tables may not display correctly.';
+        }
+        marked.setOptions({
+            gfm: true,
+            breaks: true,
+            tables: true
+        });
+        ChartComponents["BarChart"] = BarChartSimple;
+        ChartComponents = {
+                "BarChart": BarChartSimple,
+                "LineChart": LineChart,
+                "LollipopChart": LollipopChart,
+                "AreaChart": AreaChart
+        };
+        setInputFocus();
+    });
 
     export let user;
     let messages = [];
@@ -20,10 +46,11 @@
 
     let displayMessages = [];
     let processedMessages = new Map();
-
+    
     // Action to get native <input> element
     function inputRef(node) {
-        textInputElement = node;        
+        textInputElement = node;
+        console.log('Input ref set:', textInputElement); // Debug
         return {
             destroy() {
                 textInputElement = null;
@@ -34,6 +61,7 @@
     $: formattedMessages = messages.map(raw => {
         try {
             const parsed = JSON.parse(raw);
+            console.log('Parsed message:', parsed);
             return parsed;
         } catch (e) {
             console.error('Failed to parse JSON:', e, raw);
@@ -50,6 +78,7 @@
                     displayMessages[existingIndex] = {
                         ...displayMessages[existingIndex],
                         content: formatted.content,
+                        charts: formatted.charts,
                         timestamp: formatted.timestamp
                     };
                     displayMessages = [...displayMessages];
@@ -58,23 +87,14 @@
                 }
             }
         });
+        console.log('Updated displayMessages:', displayMessages.map(m => ({ id: m.id, charts: m.charts })));
         if (messagesContainer) {
             messagesContainer.scrollBottom= messagesContainer.scrollHeight;
         }
     }
 
     onMount(() => {
-        user = user.split('@')[0];
-        if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
-            console.error('marked or DOMPurify not loaded');
-            status = 'Error: Markdown renderer or sanitizer not loaded. Tables may not display correctly.';
-        }
-        marked.setOptions({
-            gfm: true,
-            breaks: true,
-            tables: true
-        });
-        setInputFocus();
+        
     });
 
     afterUpdate(() => {
@@ -82,8 +102,7 @@
             setInputFocus();
         }
     });
-    
-    //not working
+
     function setInputFocus() {
         if (textInputElement) {
             console.log('Setting focus on textInputElement:', textInputElement); // Debug
@@ -177,6 +196,15 @@
         const date = new Date(timestamp);
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
+    // Decode HTML entities (e.g., &quot; -> ")
+    function decodeHtml(html) {
+        const txt = document.createElement('textarea');
+        txt.innerHTML = html;
+        const decoded = txt.value;
+        console.log('decodeHtml input:', html);
+        console.log('decodeHtml output:', decoded);
+        return decoded;
+    }
 
     function handleMessage(message) {
         const messageId = message.timestamp;
@@ -192,18 +220,22 @@
             lastAssistantContent = '';
             currentAssistantMessageId = null;
             return {
-              role: user, //message.role,         //todo: use message.role when user is not there (i.e. no auth)
-                content: formatContent(message.content),
+                role: user, //message.role,
+                content: formatContent(message.content, message.role),
                 timestamp: message.timestamp,
+                charts: [],
                 class: 'user'
             };
         } else if (message.role === 'assistant' || message.role === 'model') {
             if (!currentAssistantMessageId) {
                 currentAssistantMessageId = messageId;
                 lastAssistantContent = message.content || '';
+                const { html, charts } = formatContent(message.content);
+                console.log("Got charts "+charts);
                 return {
-                    role: 'lh_assist', //message.role,    //externalize it
-                    content: formatContent(message.content),
+                    role: message.role,
+                    content: html,
+                    charts,
                     timestamp: message.timestamp,
                     class: 'assistant'
                 };
@@ -214,9 +246,12 @@
                 console.log('New text:', newText);
                 if (newText) {
                     lastAssistantContent = message.content || '';
+                    const { html, charts } = formatContent(lastAssistantContent);
+                    console.log("Got charts2 "+charts.length);
                     return {
                         role: message.role,
-                        content: formatContent(lastAssistantContent),
+                        content: html,
+                        charts,
                         timestamp: message.timestamp,
                         class: 'assistant',
                         updateId: currentAssistantMessageId
@@ -227,7 +262,7 @@
         } else if (message.role === 'system') {
             return {
                 role: message.role,
-                content: formatContent(message.content),
+                content: formatContent(message.content, "system"),
                 timestamp: message.timestamp,
                 class: 'error'
             };
@@ -242,16 +277,73 @@
         }
     }
 
-    function formatContent(text) {
+    function formatContent(text, role="") {
         try {
             console.log('Raw Markdown:', text);
-            const html = marked.parse(text || '', { gfm: true, breaks: true, tables: true });
-            console.log('Rendered HTML:', html);
-            return DOMPurify.sanitize(html);
-        } catch (err) {
-            console.error('Markdown parsing error:', err);
-            return (text || '').replace(/\n/g, '<br>');
-        }
+            if (typeof window === 'undefined') {
+                console.log('Skipping chart rendering on server-side');
+                return { html: (text || '').replace(/\n/g, '<br>'), charts: [] };
+            }
+            let html = marked.parse(text || '', { gfm: true, breaks: true, tables: true });
+            let charts = [];
+            // Detect and replace chart code blocks
+            html = html.replace(/<pre><code class="language-chart">([\s\S]*?)<\/code><\/pre>/g, (match, jsonStr) => {
+
+            if(role!="user" ){ //&& !text.includes("bar chart")){
+                
+                    try {
+                        const decodedJson = decodeHtml(jsonStr.trim());
+                        console.log('Decoded JSON:', decodedJson);
+                        const chartConfig = JSON.parse(decodedJson);
+                        console.log('Parsed chart config:', chartConfig);
+
+                        // Validate required fields
+                        if (!chartConfig.type) {
+                            console.warn('Chart missing type:', chartConfig);
+                            return `<pre><code>${jsonStr}</code></pre>`;
+                        }
+                        if (!chartConfig.data) {
+                            console.warn('Chart missing data or labels:', chartConfig);
+                            return `<pre><code>${jsonStr}</code></pre>`;
+                        }
+                        if (!chartConfig.options || !chartConfig.options.axes) {
+                            console.warn('Chart missing axes configuration:', chartConfig);
+                            return `<pre><code>${jsonStr}</code></pre>`;
+                        }
+
+                        const chartType = chartConfig.type.charAt(0).toUpperCase() + chartConfig.type.slice(1) + 'Chart';
+                        console.log('Normalized chart type:', chartType);
+
+                        if (ChartComponents[chartType]) {
+                            const chartId = `chart-${Math.random().toString(36).substr(2, 9)}`;
+                            charts.push({
+                                id: chartId,
+                                component: ChartComponents[chartType],
+                                data: chartConfig.data,
+                                options: chartConfig.options
+                            });
+                            console.log('Chart added to charts:', { id: chartId, type: chartType });
+                            return `<div class="carbon-chart" id="${chartId}"></div>`;                            
+                        } else {
+                            console.warn(`Chart type ${chartType} not supported or not loaded`);
+                            return `<pre><code>${jsonStr}</code></pre>`;
+                        }
+                    
+                    } catch (e) {
+                        console.log('Chart parsing error');
+                        return `<pre><code>${jsonStr}</code></pre>`;                      
+                    }
+                }
+                    });
+                console.log('Rendered HTML:', html);            
+                console.log('Charts extracted:', charts);
+                if ((role== "user" || role== "system" ) && charts.length==0) return DOMPurify.sanitize(html);
+                return { html: DOMPurify.sanitize(html), charts };
+
+            } catch (e) {
+                console.error('Markdown parsing error:', e);
+                return { html: (text || '').replace(/\n/g, '<br>'), charts: [] };
+            }
     }
 </script>
 
@@ -265,6 +357,14 @@
 </div>
 <div class="chat-container">
     <div class="status">{status}</div>
+    <div class="details">
+        <p>You can ask questions like:</p>
+        <ul>
+            <li>List namespaces</li>
+            <li>List tables in namespace X</li>
+            <li>Describe table X.Y</li>
+        </ul>
+    </div>
     <div class="messages" bind:this={messagesContainer}>
         {#each displayMessages as msg (msg.id)}
             <div class="message {msg.class}">
@@ -273,18 +373,35 @@
                 <div class="markdown" class:markdown--user={msg.class === 'user'}>
                     {@html msg.content}
                 </div>
+                
+                {#if msg.charts}                
+                {#each msg.charts as chart (chart.id)}                
+                    <div class="carbon-chart" id={chart.id}>                        
+                        {#if chart.component}                                
+                            <svelte:component this={chart.component} data={chart.data} options={chart.options} />
+                        {:else}
+                            <p>Chart component not available</p>
+                        {/if}
+                    </div>
+                {/each}
+                {/if}
+                
             </div>
         {/each}
     </div>
+    {#if isSending}        
+        <Loading withOverlay={false} small />        
+    {/if}
     <div class="input-area">
-        <TextInput
+        <TextArea
+            rows={3}
             bind:value={message}
             placeholder="Type your message..."
             on:keydown={handleKeyDown}
             disabled={isSending}
         >
             <input use:inputRef />
-        </TextInput>
+        </TextArea>
         <Button
             on:click={sendMessage}
             iconDescription="Send Message"
@@ -304,6 +421,11 @@
         padding: 5px;
         display: flex;
         flex-direction: column;
+    }
+    .carbon-chart {
+        margin: 10px 0;
+        width: 100%;
+        height: 400px; 
     }
 
     .status {
@@ -337,6 +459,7 @@
     .message.user {
         background-color: #e2e5e6;
         align-items: flex-end;
+        padding-right: 10px;
     }
 
     .message.assistant {
@@ -410,5 +533,20 @@
     .input-area :global(.bx--text-input:focus) {
         outline: 2px solid #0f62fe;
         outline-offset: 2px;
+    }
+
+    .chat-container ul {
+    list-style-type: none; /* Remove default bullets */
+    padding-left: 0; /* Remove default padding */
+    }
+
+    .chat-container ul li {
+    background-image: url("checkmark.svg"); /* Custom bullet image */
+    background-repeat: no-repeat;
+    background-position: 0 50%; /* Center image vertically */
+    background-size: 1.2em; /* Adjust image size */
+    padding-left: 1.5em; /* Space for the custom bullet */
+    margin-bottom: 0.5em;
+    color: #333;
     }
 </style>
