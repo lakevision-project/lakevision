@@ -18,9 +18,12 @@
 		ToastNotification,
 		Dropdown,
         Toggle,
-		ComboBox
+		ComboBox,
+		Accordion,
+		AccordionItem,
+		Search
 	} from 'carbon-components-svelte';
-	import { Renew, Run, Calendar, WarningAltFilled, CheckmarkFilled, Information } from 'carbon-icons-svelte';
+	import { Renew, Run, Calendar, WarningAltFilled, CheckmarkFilled, Information , ChevronRight} from 'carbon-icons-svelte';
 	import VirtualTable from '$lib/components/VirtTable3.svelte';
 	import '@carbon/charts-svelte/styles.css';
 
@@ -34,7 +37,13 @@
 	let scheduledJobs = [];
 	let overviewLoading = true;
     let overviewData = [];
+    let rawOverviewData = [];
+    let groupedOverviewData = {};
+    let overviewSearchTerm = '';
     let expandedOccurrences = {};
+	let expandedNamespaces = {};
+
+	const severityOrder = { critical: 3, warning: 2, info: 1 };
 
 	// --- State for rule names and expanding results ---
 	let allRules = [];
@@ -173,38 +182,109 @@
 		}
 	}
 
-	async function fetchOverviewData() {
-        overviewLoading = true;
-        try {
-            const response = await fetch(`/api/namespaces/*/insights/summary`);
-            if (!response.ok) throw new Error('Failed to fetch overview summary');
-            
-            const rawData = await response.json();
+	$: {
+        let processedData = rawOverviewData;
 
-            overviewData = rawData.map(item => ({
-                ...item,
-                id: `${item.code}-${item.namespace}` 
-            }));
+        if (overviewSearchTerm) {
+            const lowerCaseSearch = overviewSearchTerm.toLowerCase();
 
-            // --- START: ADDED CODE ---
-            // Pre-populate the expanded state for the Overview tab
-            let newExpandedOccurrences = {};
-            overviewData.forEach(row => {
-                row.occurrences.forEach((occurrence, i) => {
-                    const compositeKey = `${row.code}-${occurrence.table_name}-${i}`;
-                    newExpandedOccurrences[compositeKey] = true;
-                });
-            });
-            expandedOccurrences = newExpandedOccurrences;
-            // --- END: ADDED CODE ---
+            processedData = rawOverviewData
+                .map(item => {
+                    // Check for matches at the group level (rule name and namespace)
+                    const ruleName = ruleIdToNameMap.get(item.code) || item.code;
+                    const ruleMatch = ruleName.toLowerCase().includes(lowerCaseSearch);
+                    const namespaceMatch = item.namespace.toLowerCase().includes(lowerCaseSearch);
 
-        } catch (error) {
-            console.error('Error fetching overview summary:', error);
-            overviewData = [];
-        } finally {
-            overviewLoading = false;
+                    // Always filter the tables within the group
+                    const filteredOccurrences = item.occurrences.filter(occ =>
+                        occ.table_name.toLowerCase().includes(lowerCaseSearch)
+                    );
+
+                    // Case 1: If the rule or namespace itself matches, show the group with ALL its tables.
+                    // This provides context. E.g., searching for a namespace shows all its tables.
+                    if (ruleMatch || namespaceMatch) {
+                        return item;
+                    }
+
+                    // Case 2: If only a table name matched, show the group but with ONLY the filtered tables.
+                    if (filteredOccurrences.length > 0) {
+                        return { ...item, occurrences: filteredOccurrences };
+                    }
+
+                    // Case 3: If nothing matched, exclude this group from the results.
+                    return null;
+                })
+                .filter(Boolean); // This removes any `null` entries from the array.
         }
+        
+        // This function groups the now correctly filtered data into the hierarchical structure.
+        const groupData = (data) => {
+            const groups = {};
+            
+
+            data.forEach(item => {
+                const ruleName = ruleIdToNameMap.get(item.code) || item.code;
+                if (!groups[ruleName]) {
+                    groups[ruleName] = { namespaces: {}, suggested_action: item.suggested_action };
+                }
+                if (!groups[ruleName].namespaces[item.namespace]) {
+                    groups[ruleName].namespaces[item.namespace] = [];
+                }
+                groups[ruleName].namespaces[item.namespace].push(...item.occurrences);
+            });
+            
+            for (const rule of Object.values(groups)) {
+                let maxSeverity = 'info';
+                let maxSeverityValue = 1;
+                
+                for (const tables of Object.values(rule.namespaces)) {
+                    for (const table of tables) {
+                        const currentSeverityValue = severityOrder[table.severity.toLowerCase()] || 1;
+                        if (currentSeverityValue > maxSeverityValue) {
+                            maxSeverityValue = currentSeverityValue;
+                            maxSeverity = table.severity.toLowerCase();
+                        }
+                    }
+                }
+                rule.highestSeverity = maxSeverity;
+            }
+            return groups;
+        };
+
+        groupedOverviewData = groupData(processedData);
     }
+
+	async function fetchOverviewData() {
+		overviewLoading = true;
+		try {
+			const response = await fetch(`/api/namespaces/*/insights/summary`);
+			if (!response.ok) throw new Error('Failed to fetch overview summary');
+			
+			const rawData = await response.json();
+
+			rawOverviewData = rawData.map(item => ({
+				...item,
+				id: `${item.code}-${item.namespace}` 
+			}));
+
+			// --- START: ADDED CODE TO EXPAND NAMESPACES ---
+			// Create an object where every namespace key is set to 'true'
+			let newExpanded = {};
+			rawData.forEach(item => {
+				const ruleName = ruleIdToNameMap.get(item.code) || item.code;
+				const namespaceKey = `${ruleName}-${item.namespace}`;
+				newExpanded[namespaceKey] = true;
+			});
+			expandedNamespaces = newExpanded;
+			// --- END: ADDED CODE ---
+
+		} catch (error) {
+			console.error('Error fetching overview summary:', error);
+			rawOverviewData = [];
+		} finally {
+			overviewLoading = false;
+		}
+	}
 
 	async function fetchLatestInsights() {
 		insights_loading = true;
@@ -383,69 +463,94 @@
 	</Tabs>
 	<div class="tab-content-container">
 		{#if insightsSubTab === 0}
-            {#if overviewLoading}
-                <DataTableSkeleton rowCount="{5}" columnCount="{4}" />
-            {:else if overviewData.length === 0}
-                <p>No active insights found across the lakehouse. Great job!</p>
-            {:else}
-                <div class="insights-virtual-table-container-lakehouse">
-                    <VirtualTable
-                        data="{overviewData}"
-                        columns="{overviewColumns}"
-                        bind:columnWidths="{overviewColWidths}"
-                        disableVirtualization="{true}"
-                        enableSearch="{true}"
-                    >
-                        <div slot="cell" let:row let:columnKey let:searchQuery>
-                            {#if columnKey === 'Rule'}
-                                {@html highlightMatch(ruleIdToNameMap.get(row.code) || row.code, searchQuery)}
-                            {:else if columnKey === 'Affected Tables'}
-                                <div class="rules-cell-container">
-                                    {#each row.occurrences as occurrence, i}
-                                        {@const compositeKey = `${row.code}-${occurrence.table_name}-${i}`}
-                                        <div
-                                            class="rule-item"
-                                            role="button"
-                                            tabindex="0"
-                                            on:click="{() => {
-                                                expandedOccurrences[compositeKey] = !expandedOccurrences[compositeKey];
-                                            }}"
-                                        >
-                                            <div class="rule-item-header">
-                                                {#if occurrence.severity.toLowerCase() === 'warning'}
-                                                    <WarningAltFilled size="{16}" style="color: var(--cds-support-03, #ff832b);" />
-                                                {:else if occurrence.severity.toLowerCase() === 'critical'}
-                                                    <WarningAltFilled size="{16}" style="color: var(--cds-support-02, #24a148);" />
-                                                {:else}
-                                                    <Information size="{16}" style="color: #0f62fe;" />
-                                                {/if}
-                                                <span>{@html highlightMatch(occurrence.table_name, searchQuery)}</span>
-                                            </div>
+			<div class="overview-controls">
+				<Search
+					placeholder="Filter by rule, namespace, or table name..."
+					bind:value="{overviewSearchTerm}"
+				/>
+			</div>
 
-                                            {#if expandedOccurrences[compositeKey]}
-                                                <div class="rule-details">
-                                                    <div class="message-card">
-                                                        <p>
-                                                            <strong>Message:</strong>
-                                                            {@html highlightMatch(occurrence.message, searchQuery)}
-                                                        </p>
-                                                        <p>
-                                                            <strong>Timestamp:</strong>
-                                                            {new Date(occurrence.timestamp).toLocaleString()}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            {/if}
-                                        </div>
-                                    {/each}
-                                </div>
-                            {:else}
-                                {@html highlightMatch(row[columnKey.toLowerCase().replace(/ /g, '_')], searchQuery)}
-                            {/if}
-                        </div>
-                    </VirtualTable>
-                </div>
-            {/if}
+			{#if overviewLoading}
+				<DataTableSkeleton rowCount="{5}" columnCount="{1}" />
+			{:else if Object.keys(groupedOverviewData).length === 0}
+				<p>
+					{#if overviewSearchTerm}
+						No active insights match your filter criteria.
+					{:else}
+						No active insights found across the lakehouse. Great job!
+					{/if}
+				</p>
+			{:else}
+				<Accordion>
+					{#each Object.entries(groupedOverviewData).sort(([, ruleA], [, ruleB]) => {
+						const severityValueA = severityOrder[ruleA.highestSeverity.toLowerCase()] || 0;
+						const severityValueB = severityOrder[ruleB.highestSeverity.toLowerCase()] || 0;
+						return severityValueB - severityValueA; // Sort descending
+					}) as [ruleName, ruleData] (ruleName)}
+						<AccordionItem open>
+							<svelte:fragment slot="title">
+								<div class="accordion-title-container">
+									<div class="rule-title-with-icon">
+										{#if ruleData.highestSeverity === 'warning'}
+											<WarningAltFilled size="{20}" style="color: #ff832b;" />
+										{:else if ruleData.highestSeverity === 'critical'}
+											<WarningAltFilled size="{20}" style="color: #da1e28;" />
+										{:else}
+											<Information size="{20}" style="color: #0f62fe;" />
+										{/if}
+										<span>{ruleName}</span>
+									</div>
+									<Tag type="gray">{Object.keys(ruleData.namespaces).length} namespaces</Tag>
+								</div>
+							</svelte:fragment>
+							
+							<div class="accordion-content">
+								<p class="suggested-action">
+									<strong>Suggested Action:</strong> {ruleData.suggested_action}
+								</p>
+
+								<div class="custom-accordion-container">
+									{#each Object.entries(ruleData.namespaces) as [namespace, tables] (namespace)}
+										{@const namespaceKey = `${ruleName}-${namespace}`}
+										{@const isOpen = !!expandedNamespaces[namespaceKey]}
+										<div class="custom-accordion-item">
+											<button
+												class="custom-accordion-title"
+												on:click={() => (expandedNamespaces[namespaceKey] = !isOpen)}
+												aria-expanded={isOpen}
+											>
+												<ChevronRight class="chevron-icon {isOpen ? 'open' : ''}" />
+												<div class="accordion-title-container">
+													<span>{namespace}</span>
+													<Tag type="gray">{tables.length} tables</Tag>
+												</div>
+											</button>
+
+											{#if isOpen}
+												<div class="custom-accordion-content">
+													<div class="table-list">
+														{#each tables as table}
+															<div class="table-list-item">
+																<div class="table-list-header">
+																	<strong>{table.table_name}</strong>
+																</div>
+																<p class="table-message">{table.message}</p>
+																<p class="table-timestamp">
+																	Last seen: {new Date(table.timestamp).toLocaleString()}
+																</p>
+															</div>
+														{/each}
+													</div>
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							</div>
+						</AccordionItem>
+					{/each}
+				</Accordion>
+			{/if}
 		{:else if insightsSubTab === 1}
 			<div class="controls-container">
 				<div class="control-item">
@@ -743,5 +848,102 @@
 
 	.insights-virtual-table-container-lakehouse :global(.header-cell) {
         justify-content: center !important;
+    }
+
+	.overview-controls {
+        margin-bottom: 1.5rem;
+        max-width: 400px;
+    }
+
+    .accordion-title-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        padding-right: 1rem;
+    }
+
+    .accordion-content {
+        padding: 1rem 0;
+    }
+
+    .suggested-action {
+        font-style: italic;
+        color: #525252;
+        margin-bottom: 1.5rem;
+        padding-left: 1rem;
+    }
+
+    .table-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .table-list-item {
+        background-color: #f4f4f4;
+        border-left: 3px solid #0f62fe; /* Default blue */
+        padding: 0.75rem 1rem;
+        border-radius: 4px;
+    }
+    
+    .table-list-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .table-message {
+        margin: 0 0 0.5rem 0;
+        font-size: 14px;
+    }
+
+    .table-timestamp {
+        margin: 0;
+        font-size: 12px;
+        color: #525252;
+    }
+
+	.rule-title-with-icon {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+	.custom-accordion-container {
+        border-top: 1px solid #e0e0e0;
+    }
+
+    .custom-accordion-item {
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .custom-accordion-title {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 0.75rem 0;
+        background: none;
+        border: none;
+        cursor: pointer;
+        text-align: left;
+    }
+
+    .custom-accordion-title:hover {
+        background-color: #f4f4f4;
+    }
+
+    .custom-accordion-content {
+        padding: 0 1rem 1rem 2.5rem; /* Indent the content */
+    }
+
+    .chevron-icon {
+        transition: transform 150ms ease-in-out;
+        margin-right: 0.5rem;
+    }
+
+    .chevron-icon.open {
+        transform: rotate(90deg);
     }
 </style>
