@@ -541,7 +541,6 @@
     }
 
     .chat-container ul li {
-    background-image: url("checkmark.svg"); /* Custom bullet image */
     background-repeat: no-repeat;
     background-position: 0 50%; /* Center image vertically */
     background-size: 1.2em; /* Adjust image size */
