@@ -5,12 +5,6 @@ import { optimizeCss } from 'carbon-preprocess-svelte';
 export default defineConfig({
 	plugins: [
 		sveltekit(),
-		// Optimize CSS from `carbon-components-svelte` when building for production.
-		optimizeCss({
-            safelist: {
-                greedy: [/bx--/]
-            }
-        })
 	],
 	server: {
 		// Proxy API requests to your local FastAPI server
