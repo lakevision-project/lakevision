@@ -38,6 +38,18 @@
 
 	let initializedFromQuery = false;
 
+	function clearQueryParamsOnce() {
+		if (!browser) return;
+		const sp = new URLSearchParams($page.url.searchParams);
+		sp.delete('namespace');
+		sp.delete('table');
+		sp.delete('sample_limit');
+		const qs = sp.toString();
+		if (qs !== $page.url.searchParams.toString()) {
+			goto(qs ? `?${qs}` : $page.url.pathname, { replaceState: true, noScroll: true });
+		}
+	}
+
 	async function initFromQuery() {
 		if (initializedFromQuery) return;
 		if (!q_ns) return; // need at least the namespace
@@ -55,6 +67,8 @@
 		if (q_tab) setTable(q_tab);
 
 		initializedFromQuery = true;
+		// Clear params so the URL doesn’t look “stuck”
+		clearQueryParamsOnce();
 		}
 
 	onMount(() => {
