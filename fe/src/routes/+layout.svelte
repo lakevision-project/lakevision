@@ -111,7 +111,12 @@
 
 			// Decode the state parameter and redirect, preserving the original URL query
 			const decodedState = decodeURIComponent(state || '');
-			goto('/?' + decodedState);
+			if (decodedState) {
+				goto('/?' + decodedState);
+			} else {
+				// stay on the current path; don't wipe params
+				goto($page.url.pathname, { replaceState: true });
+			}
 		} else {
 			console.error('Error exchanging token');
 		}

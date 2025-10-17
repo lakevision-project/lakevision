@@ -1,6 +1,7 @@
 <script>
 	// --- MOVED FROM LAYOUT.SVELTE ---
 	import { browser } from '$app/environment';
+	import { afterNavigate } from '$app/navigation';
 	import {
 		ComboBox,
 		SideNav,
@@ -14,19 +15,56 @@
 	import { page } from '$app/stores';
 	import { Renew, FilterRemove, Information } from 'carbon-icons-svelte';
 
+	let namespace;
+	let table;
+	$: tableKey = namespace && table ? `${namespace}.${table}` : '';
 	let dropdown1_selectedId = '';
 	let dropdown2_selectedId = '';
 	let navpop = false;
 	let tabpop = false;
 	let nav_loading = false;
 	// Extract query parameters
-	let q_ns = $page.url.searchParams.get('namespace');
-	let q_tab = $page.url.searchParams.get('table');
-	let q_sample_limit = $page.url.searchParams.get('sample_limit');
+	$: q_ns = $page.url.searchParams.get('namespace') ?? '';
+	$: q_tab = $page.url.searchParams.get('table') ?? '';
+	$: q_sample_limit_raw = $page.url.searchParams.get('sample_limit');
+	$: q_sample_limit = q_sample_limit_raw && !Number.isNaN(+q_sample_limit_raw)
+	  ? +q_sample_limit_raw
+	  : null;
 
-	if (q_sample_limit && Number.isInteger(parseInt(q_sample_limit))) {
-		sample_limit.set(parseInt(q_sample_limit));
-	}
+	console.log("q_ns")
+	console.log(q_ns)
+	console.log("q_tab")
+	console.log(q_tab)
+
+	let initializedFromQuery = false;
+
+	async function initFromQuery() {
+		if (initializedFromQuery) return;
+		if (!q_ns) return; // need at least the namespace
+
+		// sample limit
+		if (q_sample_limit !== null) {
+		sample_limit.set(q_sample_limit);
+		}
+
+		// select namespace and load its tables
+		setNamespace(q_ns);
+		await get_tables(q_ns);
+
+		// then select the table (if provided)
+		if (q_tab) setTable(q_tab);
+
+		initializedFromQuery = true;
+		}
+
+	onMount(() => {
+		initFromQuery();       // handles direct loads
+		});
+
+	afterNavigate(() => {
+		// Handles the return from login (URL now has the right params)
+		initFromQuery();
+		});
 
 	export let data;
 	let isSideNavOpen = true;
@@ -132,7 +170,8 @@
 	const formatSelected = (id, items) => items.find((item) => item.id === id)?.text ?? '';
 
 	function findItemIdByText(items, text) {
-		const item = items.find((item) => item.text === text);
+		const needle = (text ?? '').toLowerCase();
+		const item = items.find((it) => (it.text ?? '').toLowerCase() === needle);
 		return item ? item.id : null;
 	}
 
@@ -141,27 +180,17 @@
 		window.history.replaceState(null, '', url);
 	}
 
-	if (q_tab) {
-		setNamespaceAndTable(q_ns, q_tab);
-	}
 
 	$: if (browser) {
-		if (Number.isInteger(dropdown1_selectedId) && cc == 0 && !Number.isInteger(dropdown2_selectedId)) {
-			get_tables(formatSelected(dropdown1_selectedId, data.namespaces));
-			cc++;
-		} else if (Number.isInteger(dropdown1_selectedId) && Number.isInteger(dropdown2_selectedId)) {
-			cc = 0;
-		} else if (
-			(!Number.isInteger(dropdown1_selectedId) && !Number.isInteger(dropdown2_selectedId)) ||
-			!Number.isInteger(dropdown1_selectedId)
-		) {
-			cc = 0;
-			selectedNamespce.set('');
-			selectedTable.set('');
-			dropdown2_selectedId = '';
+		const nsText = formatSelected(dropdown1_selectedId, data.namespaces);
+		if (nsText && tables.length === 0) {
+			get_tables(nsText);
 		}
 	}
 	$: if (browser) {
+		console.log("here")
+		console.log(dropdown2_selectedId)
+		console.log(formatSelected(dropdown2_selectedId, tables))
 		selectedTable.set(formatSelected(dropdown2_selectedId, tables));
 	}
 
@@ -254,8 +283,6 @@
 	import { get } from 'svelte/store';
 	import { onMount } from 'svelte';
 
-	let namespace;
-	let table;
 	let ns_props;
 	let tab_props;
 	let error = '';
@@ -284,7 +311,10 @@
 			namespace = value;
 		});
 		selectedTable.subscribe((value) => {
+			console.log("subscribe")
+			console.log(value)
 			table = value;
+			console.log(table)
 		});
 		if (namespace) ns_props = get_namespace_special_properties(namespace);
 		if (namespace && table) tab_props = get_table_special_properties(namespace + '.' + table);
@@ -676,117 +706,180 @@
 	}
 	let selected = 0;
 	$: reset(table);
-	let callOnce = 0;
+	let summaryReq = 0;
+	let propertiesReq = 0;
+	let schemaReq = 0;
+	let partitionSpecsReq = 0;
+	let sortOrderReq = 0;
+	let partitionsReq = 0;
+	let snapshotsReq = 0;
+	let sampleReq = 0;
+	$: tableKey = namespace && table ? `${namespace}.${table}` : '';
 	async function fetchSampleData() {
+		const myReq = ++sampleReq;
 		sample_data_loading = true;
 		try {
-			sample_data = await get_data(namespace + '.' + table, `sample?sample_limit=${$sample_limit}`);
-			lastSampleLimit = $sample_limit;
+			const data = await get_data(tableKey, `sample?sample_limit=${$sample_limit}`);
+			if (myReq === sampleReq) {
+				sample_data = data;
+				lastSampleLimit = $sample_limit;
+			}
 		} catch (err) {
-			error = err.message;
+			if (myReq === sampleReq) {
+				error = err.message;
+			}
 		} finally {
-			sample_data_loading = false;
+			if (myReq === sampleReq) {
+				sample_data_loading = false;
+			}
 		}
 	}
-	$: if (
-		selected === 3 &&
-		$sample_limit !== lastSampleLimit &&
-		!sample_data_loading &&
-		namespace &&
-		table
-	) {
+	$: if (selected === 3 && tableKey && !sample_data_loading && (sample_data.length === 0 || $sample_limit !== lastSampleLimit)) {
 		fetchSampleData();
 	}
-
-	$: (async () => {
-		if (table === '') return;
-		try {
-			if (selected == 0) {
-				if (callOnce > 0) {
-					callOnce = 0;
-					return;
+	$: if (tableKey && selected == 0) {
+		const myReq = ++summaryReq;
+		summary_loading = true;
+		(async () => {
+			try {
+				const data = await get_data(tableKey, 'summary');
+				if (myReq === summaryReq) {
+					summary = data;
+					if (tab_props && 'restricted' in tab_props) {
+						summary['Restricted'] = tab_props['restricted'];
+					}
 				}
-				callOnce++;
-				summary_loading = true;
-				summary = await get_data(namespace + '.' + table, 'summary');
-				if (tab_props && 'restricted' in tab_props) {
-					summary['Restricted'] = tab_props['restricted'];
+			} catch (err) {
+				if (myReq === summaryReq) {
+					error = err.message;
 				}
-				summary_loading = false;
+			} finally {
+				if (myReq === summaryReq) {
+					summary_loading = false;
+				}
 			}
-		} catch (err) {
-			error = err.message;
-			summary_loading = false;
-		}
-		try {
-			if (selected == 0) {
-				properties_loading = true;
-				properties = await get_data(namespace + '.' + table, 'properties');
-				properties_loading = false;
+		})();
+	}
+	$: if (tableKey && selected == 0) {
+		const myReq = ++propertiesReq;
+		properties_loading = true;
+		(async () => {
+			try {
+				const data = await get_data(tableKey, 'properties');
+				if (myReq === propertiesReq) {
+					properties = data;
+				}
+			} catch (err) {
+				if (myReq === propertiesReq) {
+					error = err.message;
+				}
+			} finally {
+				if (myReq === propertiesReq) {
+					properties_loading = false;
+				}
 			}
-		} catch (err) {
-			error = err.message;
-			properties_loading = false;
-		}
-		try {
-			if (selected == 0) {
-				schema_loading = true;
-				schema = await get_data(namespace + '.' + table, 'schema');
-				schema_loading = false;
+		})();
+	}
+	$: if (tableKey && selected == 0) {
+		const myReq = ++schemaReq;
+		schema_loading = true;
+		(async () => {
+			try {
+				const data = await get_data(tableKey, 'schema');
+				if (myReq === schemaReq) {
+					schema = data;
+				}
+			} catch (err) {
+				if (myReq === schemaReq) {
+					error = err.message;
+				}
+			} finally {
+				if (myReq === schemaReq) {
+					schema_loading = false;
+				}
 			}
-		} catch (err) {
-			error = err.message;
-			schema_loading = false;
-		}
-		try {
-			if (selected == 0) {
-				partition_specs_loading = true;
-				partition_specs = await get_data(namespace + '.' + table, 'partition-specs');
-				partition_specs_loading = false;
+		})();
+	}
+	$: if (tableKey && selected == 0) {
+		const myReq = ++partitionSpecsReq;
+		partition_specs_loading = true;
+		(async () => {
+			try {
+				const data = await get_data(tableKey, 'partition-specs');
+				if (myReq === partitionSpecsReq) {
+					partition_specs = data;
+				}
+			} catch (err) {
+				if (myReq === partitionSpecsReq) {
+					error = err.message;
+				}
+			} finally {
+				if (myReq === partitionSpecsReq) {
+					partition_specs_loading = false;
+				}
 			}
-		} catch (err) {
-			error = err.message;
-			partition_specs_loading = false;
-		}
-		try {
-			if (selected == 0) {
-				sort_order_loading = true;
-				sort_order = await get_data(namespace + '.' + table, 'sort-order');
-				sort_order_loading = false;
+		})();
+	}
+	$: if (tableKey && selected == 0) {
+		const myReq = ++sortOrderReq;
+		sort_order_loading = true;
+		(async () => {
+			try {
+				const data = await get_data(tableKey, 'sort-order');
+				if (myReq === sortOrderReq) {
+					sort_order = data;
+				}
+			} catch (err) {
+				if (myReq === sortOrderReq) {
+					error = err.message;
+				}
+			} finally {
+				if (myReq === sortOrderReq) {
+					sort_order_loading = false;
+				}
 			}
-		} catch (err) {
-			error = err.message;
-			sort_order_loading = false;
-		}
-		try {
-			if (selected == 1 && partitions.length == 0 && !partitions_loading) {
-				partitions_loading = true;
-				partitions = await get_data(namespace + '.' + table, 'partitions');
-				partitions_loading = false;
+		})();
+	}
+	$: if (tableKey && selected == 1) {
+		const myReq = ++partitionsReq;
+		partitions_loading = true;
+		(async () => {
+			try {
+				const data = await get_data(tableKey, 'partitions');
+				if (myReq === partitionsReq) {
+					partitions = data;
+				}
+			} catch (err) {
+				if (myReq === partitionsReq) {
+					error = err.message;
+				}
+			} finally {
+				if (myReq === partitionsReq) {
+					partitions_loading = false;
+				}
 			}
-		} catch (err) {
-			error = err.message;
-			partitions_loading = false;
-		}
-		try {
-			if (selected == 2 && snapshots.length == 0) {
-				snapshots_loading = true;
-				snapshots = await get_data(namespace + '.' + table, 'snapshots');
-				snapshots_loading = false;
+		})();
+	}
+	$: if (tableKey && selected == 2) {
+		const myReq = ++snapshotsReq;
+		snapshots_loading = true;
+		(async () => {
+			try {
+				const data = await get_data(tableKey, 'snapshots');
+				if (myReq === snapshotsReq) {
+					snapshots = data;
+				}
+			} catch (err) {
+				if (myReq === snapshotsReq) {
+					error = err.message;
+				}
+			} finally {
+				if (myReq === snapshotsReq) {
+					snapshots_loading = false;
+				}
 			}
-		} catch (err) {
-			error = err.message;
-			snapshots_loading = false;
-		}
-		try {
-			if (selected == 3 && sample_data.length == 0 && !sample_data_loading) {
-				fetchSampleData();
-			}
-		} catch (err) {
-			error = err.message;
-			sample_data_loading = false;
-		}
-	})();
+		})();
+	}
 
 	$: {
 		if (selected === 5 && table) {
