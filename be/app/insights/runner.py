@@ -148,14 +148,15 @@ class InsightsRunner:
             self.insight_storage.save_many(insight_records)
 
         self.active_insight_storage.delete_by_attributes({
-            "table_name": qualified_table_name(table.name()),
+            "namespace": namespace,
+            "table_name": table_name,
             "code": list(ids_to_run)
         })
 
         if run_result:
             new_active_insights = [
                 ActiveInsight(
-                    table_name=insight.table,
+                    table_name=table_name,
                     code=insight.code,
                     namespace=namespace,
                     severity=insight.severity,
