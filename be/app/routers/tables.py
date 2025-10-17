@@ -21,7 +21,7 @@ def read_tables(namespace: str = None, refresh: bool = False, user=Depends(check
     # THIS LINE WAS MISSING AND SHOULD BE ADDED BACK
     if config.AUTH_ENABLED and not user:
         raise HTTPException(status_code=401, detail="User not logged in")
-
+    ret = []
     from app.dependencies import namespaces, ns_tables
     if not namespace:
         if refresh or not ns_tables:
@@ -29,12 +29,13 @@ def read_tables(namespace: str = None, refresh: bool = False, user=Depends(check
                 namespaces[:] = lv.get_namespaces()
             ns_tables.clear()
             ns_tables.update(lv.get_all_table_names(namespaces))
-        return [
-            {"id": f"{ns}-{t}", "text": t, "namespace": ns}
-            for ns, tables in ns_tables.items() for t in tables
-        ]
-    tables = lv.get_tables(namespace)
-    return [{"id": f"{namespace}-{t[-1]}", "text": t[-1], "namespace": namespace} for t in tables]
+        for namespace, tables in ns_tables.items():           
+            for idx, table in enumerate(tables):            
+                ret.append({"id": idx, "text": table, "namespace": ".".join(namespace)})
+        return ret
+    for idx, table in enumerate(lv.get_tables(namespace)):
+        ret.append({"id": idx, "text": table[-1], "namespace": namespace})        
+    return ret
 
 
 @router.get("/api/namespaces/{namespace}/special-properties")

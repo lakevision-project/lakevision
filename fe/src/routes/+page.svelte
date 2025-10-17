@@ -31,11 +31,6 @@
 	  ? +q_sample_limit_raw
 	  : null;
 
-	console.log("q_ns")
-	console.log(q_ns)
-	console.log("q_tab")
-	console.log(q_tab)
-
 	let initializedFromQuery = false;
 
 	function clearQueryParamsOnce() {
@@ -164,7 +159,7 @@
 		ns.text.toLowerCase().includes(searchNamespaceQuery.toLowerCase())
 	);
 
-	$: filteredTables = (namespace == '' ? all_tables : tables).filter((tb) =>
+	$: filteredTables = ((namespace == '' || !namespace) ? all_tables : tables).filter((tb) =>
 		tb.text.toLowerCase().includes(searchTableQuery.toLowerCase())
 	);
 
@@ -202,9 +197,6 @@
 		}
 	}
 	$: if (browser) {
-		console.log("here")
-		console.log(dropdown2_selectedId)
-		console.log(formatSelected(dropdown2_selectedId, tables))
 		selectedTable.set(formatSelected(dropdown2_selectedId, tables));
 	}
 
@@ -325,10 +317,7 @@
 			namespace = value;
 		});
 		selectedTable.subscribe((value) => {
-			console.log("subscribe")
-			console.log(value)
 			table = value;
-			console.log(table)
 		});
 		if (namespace) ns_props = get_namespace_special_properties(namespace);
 		if (namespace && table) tab_props = get_table_special_properties(namespace + '.' + table);
