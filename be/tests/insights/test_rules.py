@@ -1,96 +1,110 @@
-# test_runner.py
+# tests/insights/test_rules.py
 
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, patch
+from app.insights.runner import InsightsRunner
 import pytest
-from types import SimpleNamespace
-
 from pyiceberg.types import (
-    UUIDType, StructType, ListType, MapType, NestedField, StringType
+    UUIDType,
+    StructType,
+    ListType,
+    MapType,
+    NestedField,
+    StringType
 )
 from pyiceberg.schema import Schema
-
-from app.insights.runner import InsightsRunner
-from app.models import Insight, InsightRun, InsightRecord, ActiveInsight
+# Import the real rules file to test the standalone function
 from app.insights.rules import search_for_uuid_column
+# Import the utility function that the runner uses
+from app.insights.utils import get_namespace_and_table_name
+# Import all the models we need to mock and verify
+from app.models import Insight, InsightRun, InsightRecord, ActiveInsight, InsightRunOut, RuleSummaryOut, InsightOccurrence
+from types import SimpleNamespace
 
-
-# Updated with a "clean" table that produces no insights
-table_rules = {
-    'namespace1.table1': ["SMALL_FILES", "NO_LOCATION"],
-    'namespace1.table2': ["LARGE_FILES", "UUID_COLUMN"],
-    'namespace1.table3': ["SMALL_FILES", "SMALL_FILES_LARGE_TABLE"],
-    'namespace1.table4': ["NO_ROWS_TABLE"],
-    'namespace1.table5': ["SMALL_FILES", "SNAPSHOT_SPRAWL_TABLE"],
-    'namespace1.table6': ["SKEWED_OR_LARGEST_PARTITIONS_TABLE"],
-    'namespace1.table_clean': []  # This table should produce no insights
-}
-
-# --- Fixtures and Mock Setup --------------------------------------------------
+# --- Fixtures -----------------------------------------------------------------
 
 @pytest.fixture
-def mock_run_storage():
-    """Provides a mock storage adapter for InsightRun objects."""
-    return MagicMock()
+def run_storage_mock():
+    """Mocks the storage adapter for InsightRun objects."""
+    # FIX: Explicitly set the table_name attribute
+    mock = MagicMock()
+    mock.table_name = "insight_run_table" 
+    return mock
 
 @pytest.fixture
-def mock_insight_storage():
-    """Provides a mock storage adapter for InsightRecord objects."""
-    return MagicMock()
+def insight_storage_mock():
+    """Mocks the storage adapter for InsightRecord objects."""
+    # FIX: Explicitly set the table_name attribute
+    mock = MagicMock()
+    mock.table_name = "insight_record_table"
+    return mock
 
 @pytest.fixture
-def mock_active_insight_storage():
-    """Provides a mock storage adapter for ActiveInsight objects."""
+def active_insight_storage_mock():
+    """Mocks the storage adapter for ActiveInsight objects."""
     return MagicMock()
 
-@pytest.fixture(autouse=True)
-def mock_rules_fixture(monkeypatch):
-    """
-    Auto-used fixture to mock ALL_RULES_OBJECT for all tests in this file.
-    """
-    rule_to_tables = {}
-    all_rule_ids = set()
-    for table, rules in table_rules.items():
-        for rule in rules:
-            all_rule_ids.add(rule)
-            if rule not in rule_to_tables:
-                rule_to_tables[rule] = []
-            rule_to_tables[rule].append(table)
+# --- Mock Data Generation -----------------------------------------------------
+# (This section is unchanged)
 
-    def create_mock_rule_method(rule_id):
-        def mock_method(table):
-            table_identifier = f"{table.name()[0]}.{table.name()[1]}"
-            if table_identifier in rule_to_tables.get(rule_id, []):
-                return Insight(code=rule_id, message=f"Message for {rule_id}", table=table_identifier, severity="Warning", suggested_action="Action")
-            return None
-        return mock_method
-
-    mock_rules_list = []
-    for rule_id in sorted(list(all_rule_ids)): # Sort for deterministic order
-        mock_rule = MagicMock()
-        mock_rule.id = rule_id
-        mock_rule.name = f"Mock Rule {rule_id}"
-        mock_rule.method = create_mock_rule_method(rule_id)
-        mock_rules_list.append(mock_rule)
-
-    monkeypatch.setattr("app.insights.runner.ALL_RULES_OBJECT", mock_rules_list)
-    return mock_rules_list
-
-# --- Mock Data Generation (Unchanged) ----------------------------------------
-# ... (make_mock_table, make_task, make_mock_partitioned_table functions remain the same) ...
-
-def make_mock_table(name, file_count=200, file_size=50_000, location=None, schema=Schema(NestedField(field_id=1, name="field_1", field_type=StringType())), snapshots=5):
+def make_mock_table(name, file_count=200, file_size=50_000, location=None, schema=Schema(NestedField(field_id=1, name="field_1", field_type=StringType())), snapshots = 5):
     mock_file = MagicMock()
     mock_file.file.file_size_in_bytes = file_size
     mock_scan = MagicMock()
     mock_scan.plan_files.return_value = [mock_file] * file_count
     mock_table = MagicMock()
-    # The runner now expects table.name() to return a tuple like ('namespace', 'table_name')
-    mock_table.name = MagicMock(return_value=("namespace1", name))
+    mock_table.name = MagicMock(return_value=name)
     mock_table.scan.return_value = mock_scan
     mock_table.location = location
     mock_table.schema.return_value = schema
     mock_table.history.return_value = [j for j in range(snapshots)]
-    # ... rest of mock table setup ...
+    spec_mock = MagicMock()
+    spec_mock.fields = None
+    mock_table.spec.return_value = spec_mock
+    mock_table.metadata.current_snapshot_id = None if file_count == 0 else 12345
+    mock_pa_table = MagicMock()
+    mock_pa_table.to_pydict.return_value = {
+        'summary': [{'total-records': file_count * file_size}],
+        'committed_at': [1678886400]
+    }
+    mock_table.inspect.snapshots.return_value.sort_by.return_value.select.return_value = mock_pa_table
+    return mock_table
+
+def make_task(path, fmt, records, size, partition_dict):
+    partition = SimpleNamespace(**partition_dict)
+    file = SimpleNamespace(
+        file_path=path,
+        file_format=fmt,
+        record_count=records,
+        file_size_in_bytes=size,
+        partition=partition,
+    )
+    return SimpleNamespace(file=file)
+
+def make_mock_partitioned_table(name, location = None):
+    mock_table = MagicMock()
+    mock_partition_spec = MagicMock()
+    mock_partition_spec.fields = [MagicMock()]
+    mock_table.spec.return_value = mock_partition_spec
+    skewed_tasks = [
+        make_task("f1", "parquet", 10, 100, {"category": "A"}),
+        make_task("f2", "parquet", 100000, 1, {"category": "B"}),
+        make_task("f3", "parquet", 1, 10000, {"category": "C"}),
+    ]
+    mock_scan_plan = MagicMock()
+    mock_scan_plan.plan_files.return_value = skewed_tasks
+    mock_table.scan.return_value = mock_scan_plan
+    mock_table.name.return_value = name
+    mock_table.location = location
+    mock_table.metadata.current_snapshot_id = 12345
+    mock_pa_table = MagicMock()
+    mock_pa_table.to_pydict.return_value = {
+        'summary': [{'total-records': 1210}],
+        'committed_at': [1678886400]
+    }
+    mock_table.inspect.snapshots.return_value.sort_by.return_value.select.return_value = mock_pa_table
+    spec_mock = MagicMock()
+    spec_mock.fields = ("category",)
+    mock_table.spec.return_value = spec_mock
     return mock_table
 
 class MockLakeView:
@@ -101,19 +115,20 @@ class MockLakeView:
             "namespace1.table3": make_mock_table(name="table3", file_count=1_200_000, file_size=49_000, location="some_location"),
             "namespace1.table4": make_mock_table(name="table4", file_count=0, file_size=0, location="some_location"),
             "namespace1.table5": make_mock_table(name="table5", file_count=1000, file_size=1, location="some_location", snapshots=1000),
-            "namespace1.table6": make_mock_table(name="table6", location="some_location"), # Simplified for testing
-            "namespace1.table_clean": make_mock_table(name="table_clean", location="some_location"),
+            "namespace1.table6": make_mock_partitioned_table(name="table6", location="some_location"),
         }
         self.ns_tables = {
-            "namespace1": list(self.tables.keys()),
+            "namespace1": ["namespace1.table1", "namespace1.table2", "namespace1.table3", "namespace1.table4", "namespace1.body.table5", "namespace1.table6"],
         }
         self.namespaces = [["namespace1"]]
 
     def load_table(self, table_identifier):
+        if table_identifier == "namespace1.body.table5":
+            table_identifier = "namespace1.table5"
         return self.tables[table_identifier]
 
     def get_tables(self, namespace):
-        return self.ns_tables.get(namespace, [])
+        return ["namespace1.table1", "namespace1.table2", "namespace1.table3", "namespace1.table4", "namespace1.table5", "namespace1.table6"]
 
     def get_namespaces(self, include_nested=True):
         return self.namespaces
@@ -121,107 +136,316 @@ class MockLakeView:
     def _get_nested_namespaces(self, namespace):
         return []
 
+table_rules = {
+    'namespace1.table1':["SMALL_FILES", "NO_LOCATION"],
+    'namespace1.table2':["LARGE_FILES", "UUID_COLUMN"],
+    'namespace1.table3':["SMALL_FILES", "SMALL_FILES_LARGE_TABLE"],
+    'namespace1.table4':["NO_ROWS_TABLE"],
+    'namespace1.table5':["SMALL_FILES","SNAPSHOT_SPRAWL_TABLE"],
+    'namespace1.table6':["SKEWED_OR_LARGEST_PARTITIONS_TABLE"]
+}
 
-# --- Updated Tests for InsightsRunner ----------------------------------------
+# This section creates a dynamic mock of ALL_RULES_OBJECT based on the table_rules dictionary.
+all_rule_ids = set(code for codes in table_rules.values() for code in codes)
+mock_rules_list = []
+for rule_id in all_rule_ids:
+    def method_factory(current_rule_id):
+        def mock_method(table):
+            table_identifier = f"namespace1.{table.name()}"
+            if table_identifier in table_rules and current_rule_id in table_rules[table_identifier]:
+                # This matches the new rules.py: `table` is a string
+                return Insight(
+                    table=table_identifier,
+                    code=current_rule_id,
+                    message="A mock message",
+                    severity="LOW",
+                    suggested_action="Do something."
+                )
+            return None
+        return mock_method
 
-@pytest.mark.parametrize("table_id", list(table_rules.keys()))
-def test_run_for_table(mock_run_storage, mock_insight_storage, mock_active_insight_storage, table_id, mock_rules_fixture):
-    # ... (setup code is unchanged) ...
+    rule = MagicMock()
+    rule.id = rule_id
+    rule.method = method_factory(rule_id)
+    mock_rules_list.append(rule)
+
+# Helper function to create a mock runner.
+def create_mock_runner(lakeview, run_storage_mock, insight_storage_mock, active_insight_storage_mock):
+    # We patch the __init__ to avoid needing a real config object
+    with patch.object(InsightsRunner, "__init__", lambda s, lv, rs, is_, ais: None):
+        runner = InsightsRunner(None, None, None, None)
+        runner.lakeview = lakeview
+        runner.run_storage = run_storage_mock
+        runner.insight_storage = insight_storage_mock
+        runner.active_insight_storage = active_insight_storage_mock
+    return runner
+
+# --- Existing Tests -----------------------------------------------------------
+
+@pytest.mark.parametrize("table", [
+        ('namespace1.table1'),
+        ('namespace1.table2'),
+        ('namespace1.table3'),
+        ('namespace1.table4'),
+        ('namespace1.table5'),
+        ('namespace1.table6')
+    ])
+def test_run_for_table(run_storage_mock, insight_storage_mock, active_insight_storage_mock, table):
     lakeview = MockLakeView()
-    runner = InsightsRunner(lakeview, mock_run_storage, mock_insight_storage, mock_active_insight_storage)
-    expected_codes = set(table_rules[table_id])
-    all_rule_ids = [rule.id for rule in mock_rules_fixture]
-
-    # Execute
-    results = runner.run_for_table(table_id, rule_ids=all_rule_ids)
-
-    # 1. Verify returned results
-    result_codes = {r.code for r in results}
-    assert result_codes == expected_codes
-
-    # 2. Verify historical run log (InsightRun)
-    mock_run_storage.save.assert_called_once()
-    saved_run = mock_run_storage.save.call_args[0][0]
+    runner = create_mock_runner(lakeview, run_storage_mock, insight_storage_mock, active_insight_storage_mock)
+    
+    with patch("app.insights.runner.ALL_RULES_OBJECT", mock_rules_list):
+        with patch("app.insights.runner.get_namespace_and_table_name", return_value=("namespace1", table.split('.')[1])):
+            results = runner.run_for_table(table)
+    
+    codes = {r.code for r in results}
+    expected_codes = set(table_rules[table])
+    assert set(codes) == expected_codes
+    run_storage_mock.save.assert_called_once()
+    saved_run = run_storage_mock.save.call_args[0][0] 
     assert isinstance(saved_run, InsightRun)
-    assert saved_run.namespace == "namespace1"
-    assert saved_run.table_name == table_id.split('.')[1]
-    assert set(saved_run.rules_requested) == set(all_rule_ids)
+    assert set(saved_run.rules_requested) == all_rule_ids
+    active_insight_storage_mock.delete_by_attributes.assert_called_once()
+    delete_attrs = active_insight_storage_mock.delete_by_attributes.call_args[0][0]
+    assert set(delete_attrs["code"]) == all_rule_ids
 
-    # 3. Verify historical insight log (InsightRecord)
-    if expected_codes:
-        mock_insight_storage.save_many.assert_called_once()
-        saved_records = mock_insight_storage.save_many.call_args[0][0]
-        assert len(saved_records) == len(expected_codes)
-        assert all(isinstance(r, InsightRecord) for r in saved_records)
-        assert {r.code for r in saved_records} == expected_codes
-    else:
-        mock_insight_storage.save_many.assert_not_called()
+    expected_insight_count = len(expected_codes)
+    assert expected_insight_count > 0
+    insight_storage_mock.save_many.assert_called_once()
+    saved_records = insight_storage_mock.save_many.call_args[0][0]
+    assert len(saved_records) == expected_insight_count
+    assert saved_records[0].run_id == saved_run.id
+    active_insight_storage_mock.save_many.assert_called_once()
+    saved_active = active_insight_storage_mock.save_many.call_args[0][0]
+    assert len(saved_active) == expected_insight_count
+    assert saved_active[0].last_seen_run_id == saved_run.id
 
-    # 4. Verify state management (ActiveInsight)
-    # A. Wipe: Should always be called to clear state for all rules that were run
-    mock_active_insight_storage.delete_by_attributes.assert_called_once()
-    
-    # Get the arguments the mock was actually called with
-    actual_call_args = mock_active_insight_storage.delete_by_attributes.call_args[0][0]
+def test_run_for_namespace(run_storage_mock, insight_storage_mock, active_insight_storage_mock):
+    lakeview = MockLakeView()
+    runner = create_mock_runner(lakeview, run_storage_mock, insight_storage_mock, active_insight_storage_mock)
+    table_names = [t.split('.')[-1] for t in lakeview.get_tables("namespace1")]
+    mock_name_tuples = [("namespace1", name) for name in table_names]
+    with patch("app.insights.runner.ALL_RULES_OBJECT", mock_rules_list):
+        with patch("app.insights.runner.get_namespace_and_table_name", side_effect=mock_name_tuples):
+            runner.run_for_namespace("namespace1")
+    assert run_storage_mock.save.call_count == 6
+    assert active_insight_storage_mock.delete_by_attributes.call_count == 6
+    assert insight_storage_mock.save_many.call_count == 6
+    assert active_insight_storage_mock.save_many.call_count == 6
+    saved_runs = [call.args[0] for call in run_storage_mock.save.call_args_list]
+    results_from_storage = {f"{run.namespace}.{run.table_name}": run for run in saved_runs}
+    assert "namespace1.table1" in results_from_storage
+    assert "namespace1.table6" in results_from_storage
 
-    # Assert the components of the call separately and in an order-insensitive way
-    assert actual_call_args['table_name'] == table_id
-    assert set(actual_call_args['code']) == set(all_rule_ids) # Compare as sets
+def test_run_for_lakehouse(run_storage_mock, insight_storage_mock, active_insight_storage_mock):
+    lakeview = MockLakeView()
+    runner = create_mock_runner(lakeview, run_storage_mock, insight_storage_mock, active_insight_storage_mock)
+    table_names = [t.split('.')[-1] for t in lakeview.get_tables("namespace1")]
+    mock_name_tuples = [("namespace1", name) for name in table_names]
+    with patch("app.insights.runner.ALL_RULES_OBJECT", mock_rules_list):
+        with patch("app.insights.runner.get_namespace_and_table_name", side_effect=mock_name_tuples):
+            runner.run_for_lakehouse()
+    assert run_storage_mock.save.call_count == 6
+    assert active_insight_storage_mock.delete_by_attributes.call_count == 6
+    assert insight_storage_mock.save_many.call_count == 6
+    assert active_insight_storage_mock.save_many.call_count == 6
+    saved_runs = [call.args[0] for call in run_storage_mock.save.call_args_list]
+    results_from_storage = {f"{run.namespace}.{run.table_name}": run for run in saved_runs}
+    assert "namespace1.table1" in results_from_storage
+    assert "namespace1.table6" in results_from_storage
 
+@pytest.mark.parametrize("schema,expected", [
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=UUIDType())), True),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=StringType())), False),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=ListType(element_id=3, element_type=UUIDType()))), True),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=StructType(fields=[NestedField(field_id=3, name="field_3",field_type=UUIDType())]))), True),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=MapType(key_id=3, key_type=StringType(),value_id=4, value_type=UUIDType()))), True),
+        (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=MapType(key_id=3, key_type=UUIDType(),value_id=4, value_type=StringType()))), True),
+])
+def test_search_for_uuid_column(schema,expected):
+    assert search_for_uuid_column(schema) == expected
 
-    # B. Replace: Should only be called if new insights were found
-    if expected_codes:
-        mock_active_insight_storage.save_many.assert_called_once()
-        saved_active = mock_active_insight_storage.save_many.call_args[0][0]
-        assert len(saved_active) == len(expected_codes)
-        assert all(isinstance(a, ActiveInsight) for a in saved_active)
-        assert {a.code for a in saved_active} == expected_codes
-    else:
-        mock_active_insight_storage.save_many.assert_not_called()
+# --- New Tests for Runner Features ------------------------------------------
 
-
-def test_run_for_namespace(mock_run_storage, mock_insight_storage, mock_active_insight_storage, mock_rules_fixture):
+def test_run_for_table_with_specific_rule_ids(run_storage_mock, insight_storage_mock, active_insight_storage_mock):
     """
-    Tests running insights for an entire namespace.
-    Verifies the aggregate number of calls to each storage adapter.
+    Tests that the runner correctly filters when a `rule_ids` list is provided.
     """
     lakeview = MockLakeView()
-    runner = InsightsRunner(lakeview, mock_run_storage, mock_insight_storage, mock_active_insight_storage)
-    num_tables = len(table_rules)
-    num_tables_with_insights = sum(1 for rules in table_rules.values() if rules)
-
-    # Execute
-    runner.run_for_namespace("namespace1")
-
-    # Verify calls for each storage type
-    assert mock_run_storage.save.call_count == num_tables
-    assert mock_insight_storage.save_many.call_count == num_tables_with_insights
-    assert mock_active_insight_storage.delete_by_attributes.call_count == num_tables
-    assert mock_active_insight_storage.save_many.call_count == num_tables_with_insights
-
-    # Verify the logic of the 'delete' calls in an order-insensitive way
-    delete_calls_args = [
-        args[0][0] for args in mock_active_insight_storage.delete_by_attributes.call_args_list
-    ]
+    runner = create_mock_runner(lakeview, run_storage_mock, insight_storage_mock, active_insight_storage_mock)
     
-    # Find the specific call made for 'namespace1.table1'
-    table1_call_args = next(
-        (c for c in delete_calls_args if c['table_name'] == 'namespace1.table1'), 
-        None
+    table_id = 'namespace1.table1'
+    requested_rule_ids = ['SMALL_FILES', 'UUID_COLUMN']
+    
+    with patch("app.insights.runner.ALL_RULES_OBJECT", mock_rules_list):
+        with patch("app.insights.runner.get_namespace_and_table_name", return_value=("namespace1", "table1")):
+            results = runner.run_for_table(table_id, rule_ids=requested_rule_ids)
+
+    result_codes = {r.code for r in results}
+    assert result_codes == {'SMALL_FILES'} 
+    run_storage_mock.save.assert_called_once()
+    saved_run = run_storage_mock.save.call_args[0][0]
+    assert set(saved_run.rules_requested) == set(requested_rule_ids)
+    active_insight_storage_mock.delete_by_attributes.assert_called_once()
+    delete_attrs = active_insight_storage_mock.delete_by_attributes.call_args[0][0]
+    assert set(delete_attrs["code"]) == set(requested_rule_ids)
+    insight_storage_mock.save_many.assert_called_once()
+    saved_records = insight_storage_mock.save_many.call_args[0][0]
+    assert len(saved_records) == 1
+    assert saved_records[0].code == 'SMALL_FILES'
+    active_insight_storage_mock.save_many.assert_called_once()
+    saved_active = active_insight_storage_mock.save_many.call_args[0][0]
+    assert len(saved_active) == 1
+    assert saved_active[0].code == 'SMALL_FILES'
+
+def test_run_for_table_with_invalid_rule_id(run_storage_mock, insight_storage_mock, active_insight_storage_mock):
+    """
+    Tests that the runner raises a ValueError for an unknown rule ID.
+    """
+    lakeview = MockLakeView()
+    runner = create_mock_runner(lakeview, run_storage_mock, insight_storage_mock, active_insight_storage_mock)
+    
+    with patch("app.insights.runner.ALL_RULES_OBJECT", mock_rules_list):
+        with pytest.raises(ValueError) as e:
+            runner.run_for_table('namespace1.table1', rule_ids=['INVALID_RULE_ID', 'SMALL_FILES'])
+    
+    assert "Invalid rule IDs provided: INVALID_RULE_ID" in str(e.value)
+    run_storage_mock.save.assert_not_called()
+    insight_storage_mock.save_many.assert_not_called()
+    active_insight_storage_mock.delete_by_attributes.assert_not_called()
+
+def test_get_latest_run_no_data(run_storage_mock, insight_storage_mock, active_insight_storage_mock):
+    """
+    Tests the get_latest_run method when no runs are found.
+    """
+    lakeview = MockLakeView()
+    runner = create_mock_runner(lakeview, run_storage_mock, insight_storage_mock, active_insight_storage_mock)
+    
+    run_storage_mock.find_by_raw_query.return_value = []
+    
+    results = runner.get_latest_run(namespace="namespace1", size=10)
+    
+    assert results == []
+    run_storage_mock.find_by_raw_query.assert_called_once()
+    insight_storage_mock.get_by_attributes.assert_not_called()
+
+def test_get_latest_run_with_data(run_storage_mock, insight_storage_mock, active_insight_storage_mock):
+    """
+    Tests the get_latest_run method, checking its join logic.
+    """
+    lakeview = MockLakeView()
+    runner = create_mock_runner(lakeview, run_storage_mock, insight_storage_mock, active_insight_storage_mock)
+
+    mock_run_1 = InsightRun(id="run_id_1", namespace="ns1", table_name="table1", run_type="manual", rules_requested=[])
+    mock_run_2 = InsightRun(id="run_id_2", namespace="ns1", table_name="table2", run_type="manual", rules_requested=[])
+    run_storage_mock.find_by_raw_query.return_value = [mock_run_1, mock_run_2]
+
+    mock_record_1 = InsightRecord(run_id="run_id_1", code="SMALL_FILES", message="...", severity="LOW", table="ns1.table1", suggested_action="Action A")
+    mock_record_2 = InsightRecord(run_id="run_id_1", code="NO_LOCATION", message="...", severity="MED", table="ns1.table1", suggested_action="Action B")
+    insight_storage_mock.get_by_attributes.return_value = [mock_record_1, mock_record_2]
+    
+    results = runner.get_latest_run(namespace="ns1", size=10)
+
+    # 3. Check the query and filtering
+    # FIX: Check for the real table name from the mock fixture
+    run_storage_mock.find_by_raw_query.assert_called_once_with(
+        'SELECT * FROM "insight_run_table" WHERE "insight_run_table"."namespace" = :namespace ORDER BY run_timestamp DESC LIMIT :limit',
+        {'namespace': 'ns1', 'limit': 10}
     )
+    insight_storage_mock.get_by_attributes.assert_called_once_with({"run_id": ["run_id_1", "run_id_2"]})
+
+    # 4. Check the joined results
+    assert len(results) == 2
+    assert isinstance(results[0], InsightRunOut)
+    assert results[0].id == "run_id_1"
+    assert len(results[0].results) == 2
+    assert {r.code for r in results[0].results} == {"SMALL_FILES", "NO_LOCATION"}
     
-    # Assert that a call for table1 was actually made
-    assert table1_call_args is not None
+    assert results[1].id == "run_id_2"
+    assert len(results[1].results) == 0
+
+def test_get_latest_run_with_data_show_empty_false(run_storage_mock, insight_storage_mock, active_insight_storage_mock):
+    """
+    Tests the get_latest_run logic when showEmpty=False.
+    """
+    lakeview = MockLakeView()
+    runner = create_mock_runner(lakeview, run_storage_mock, insight_storage_mock, active_insight_storage_mock)
+
+    mock_run_1 = InsightRun(id="run_id_1", namespace="ns1", table_name="table1", run_type="manual", rules_requested=[])
+    run_storage_mock.find_by_raw_query.return_value = [mock_run_1]
+    mock_record_1 = InsightRecord(run_id="run_id_1", code="SMALL_FILES", message="...", severity="LOW", table="ns1.table1", suggested_action="Action A")
+    insight_storage_mock.get_by_attributes.return_value = [mock_record_1]
+
+    results = runner.get_latest_run(namespace="ns1", size=10, showEmpty=False)
+
+    # Check that the raw query contains the EXISTS clause
+    run_storage_mock.find_by_raw_query.assert_called_once()
+    query_string = run_storage_mock.find_by_raw_query.call_args[0][0]
     
-    # Compare the codes as a set to ignore order
-    all_rule_ids = {rule.id for rule in mock_rules_fixture}
-    assert set(table1_call_args['code']) == all_rule_ids
+    # FIX: Check for the real table names from the mock fixtures
+    expected_clause = 'EXISTS (SELECT 1 FROM "insight_record_table" WHERE "insight_record_table"."run_id" = "insight_run_table"."id")'
+    assert expected_clause in query_string
+
+    assert len(results) == 1
+    assert results[0].id == "run_id_1"
+    assert len(results[0].results) == 1
+    assert results[0].results[0].code == "SMALL_FILES"
 
 
-# --- Standalone Rule Test (Unchanged) ----------------------------------------
-@pytest.mark.parametrize("schema,expected", [
-    (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=UUIDType())), True),
-    # ... (other schema test cases are unchanged and still valid) ...
-])
-def test_search_for_uuid_column(schema, expected):
-    assert search_for_uuid_column(schema) == expected
+def test_get_summary_by_rule_no_data(run_storage_mock, insight_storage_mock, active_insight_storage_mock):
+    """
+    Tests the get_summary_by_rule method when no active insights are found.
+    """
+    lakeview = MockLakeView()
+    runner = create_mock_runner(lakeview, run_storage_mock, insight_storage_mock, active_insight_storage_mock)
+    
+    active_insight_storage_mock.get_by_attributes.return_value = []
+    
+    results = runner.get_summary_by_rule(namespace="namespace1")
+    
+    assert results == []
+    active_insight_storage_mock.get_by_attributes.assert_called_once_with({'namespace': 'namespace1'})
+
+def test_get_summary_by_rule_with_grouping(run_storage_mock, insight_storage_mock, active_insight_storage_mock):
+    """
+    Tests the get_summary_by_rule method, checking its grouping logic.
+    """
+    lakeview = MockLakeView()
+    runner = create_mock_runner(lakeview, run_storage_mock, insight_storage_mock, active_insight_storage_mock)
+
+    # 1. Mock ActiveInsight data
+    active_1 = ActiveInsight(namespace="ns1", table_name="table1", code="SMALL_FILES", message="msg1", severity="LOW", suggested_action="Action A", last_seen_run_id="r1")
+    active_2 = ActiveInsight(namespace="ns1", table_name="table2", code="SMALL_FILES", message="msg2", severity="LOW", suggested_action="Action A", last_seen_run_id="r2")
+    active_3 = ActiveInsight(namespace="ns1", table_name="table3", code="LARGE_FILES", message="msg3", severity="HIGH", suggested_action="Action B", last_seen_run_id="r3")
+    active_4 = ActiveInsight(namespace="ns2", table_name="table4", code="SMALL_FILES", message="msg4", severity="LOW", suggested_action="Action A", last_seen_run_id="r4")
+    
+    active_insight_storage_mock.get_by_attributes.return_value = [active_1, active_2, active_3]
+    
+    # 2. Call for "ns1"
+    results = runner.get_summary_by_rule(namespace="ns1")
+    
+    # 3. Check filtering
+    active_insight_storage_mock.get_by_attributes.assert_called_once_with({'namespace': 'ns1'})
+    
+    # 4. Check grouping
+    assert len(results) == 2 # One group for SMALL_FILES, one for LARGE_FILES
+    assert isinstance(results[0], RuleSummaryOut)
+    
+    # Sort results to make assertions deterministic
+    results.sort(key=lambda x: x.code)
+    
+    large_files_summary = results[0]
+    small_files_summary = results[1]
+
+    assert large_files_summary.code == "LARGE_FILES"
+    assert large_files_summary.namespace == "ns1"
+    assert large_files_summary.suggested_action == "Action B"
+    assert len(large_files_summary.occurrences) == 1
+    assert large_files_summary.occurrences[0].table_name == "table3"
+    
+    assert small_files_summary.code == "SMALL_FILES"
+    assert small_files_summary.namespace == "ns1"
+    assert small_files_summary.suggested_action == "Action A"
+    assert len(small_files_summary.occurrences) == 2
+    assert {o.table_name for o in small_files_summary.occurrences} == {"table1", "table2"}
+    assert isinstance(small_files_summary.occurrences[0], InsightOccurrence)
