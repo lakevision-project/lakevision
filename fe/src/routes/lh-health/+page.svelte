@@ -23,7 +23,7 @@
         AccordionItem,
         Search
     } from 'carbon-components-svelte';
-    import { Renew, Run, Calendar, WarningAltFilled, CheckmarkFilled, Information , ChevronRight} from 'carbon-icons-svelte';
+    import { Renew, Run, Calendar, WarningAltFilled, CheckmarkFilled, Information , ChevronRight, ChevronDown} from 'carbon-icons-svelte';
     import VirtualTable from '$lib/components/VirtTable3.svelte';
     import '@carbon/charts-svelte/styles.css';
 
@@ -510,10 +510,17 @@
                                         <div class="custom-accordion-item">
                                             <button
                                                 class="custom-accordion-title"
-                                                on:click={() => (expandedNamespaces[namespaceKey] = !isOpen)}
+                                                on:click={() => {
+                                                    expandedNamespaces[namespaceKey] = !isOpen;
+                                                    expandedNamespaces = expandedNamespaces;
+                                                }}
                                                 aria-expanded={isOpen}
                                             >
-                                                <ChevronRight class="chevron-icon {isOpen ? 'open' : ''}" />
+                                            {#if isOpen}
+                                                <ChevronRight/>
+                                            {:else}
+                                                <ChevronDown/>
+                                            {/if}
                                                 <div class="accordion-title-container">
                                                     <span>{namespace}</span>
                                                     <Tag type="gray">{tables.length} tables</Tag>
@@ -589,6 +596,7 @@
                                         {@const hasResults = codesWithResults.has(ruleId)}
                                         {@const compositeKey = `${row.id}-${ruleId}`}
                                         {@const ruleResults = row.results.filter((r) => r.code === ruleId)}
+                                        <!-- svelte-ignore a11y-click-events-have-key-events -->
                                         <div
                                             class="rule-item"
                                             role="button"
@@ -932,15 +940,6 @@
 
     .custom-accordion-content {
         padding: 0 1rem 1rem 2.5rem; /* Indent the content */
-    }
-
-    .chevron-icon {
-        transition: transform 150ms ease-in-out;
-        margin-right: 0.5rem;
-    }
-
-    .chevron-icon.open {
-        transform: rotate(90deg);
     }
 
     .table-link {

@@ -1132,6 +1132,7 @@
 		</div>
 	</Tile>
 	<br />
+	<!-- svelte-ignore a11y-click-events-have-key-events -->
 	<Tabs bind:selected>
 		<Tab label="Summary" />
 		<Tab label="Partitions" />
