@@ -111,7 +111,7 @@ class InsightsRunner:
         return final_summary
 
     def run_for_table(self, table_identifier, rule_ids: List[str] = None, type: str = "manual") -> List[Insight]:
-        print("Running job for {table_identifier}")
+        print(f"Running job for {table_identifier}")
         table = self.lakeview.load_table(table_identifier)
 
         all_valid_ids: Set[str] = {rule.id for rule in ALL_RULES_OBJECT}
@@ -172,7 +172,7 @@ class InsightsRunner:
         return run_result
 
     def run_for_namespace(self, namespace: str, rule_ids: List[str] = None, recursive: bool = True, type: str = "manual") -> Dict[str, List[Insight]]:
-        print("Running job for namespace {namespace}")
+        print(f"Running job for namespace {namespace}")
         tables = self.lakeview.get_tables(namespace)
         results = []
         for t_ident in tables:
