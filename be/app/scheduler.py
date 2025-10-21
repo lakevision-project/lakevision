@@ -3,38 +3,11 @@ from datetime import datetime, timezone
 from croniter import croniter
 from app.lakeviewer import LakeView
 from app.insights.runner import InsightsRunner
-from app.models import InsightRun, InsightRecord, JobSchedule, ActiveInsight
+from app.models import InsightRun, InsightRecord, JobSchedule, ActiveInsight, BackgroundJob, QueuedTask
 from app.storage import get_storage, StorageInterface
+from app.insights.utils import get_namespace_and_table_name
 import logging
-
-def execute_job(schedule: JobSchedule, run_storage: StorageInterface, insight_record_storage: StorageInterface, active_insight_storage: StorageInterface):
-    """
-    Takes a schedule object and executes the insight run.
-    This function now lives in the scheduler, where it belongs.
-    """
-    lv = LakeView()
-    # The runner is now created here, using the storage connection
-    # that the scheduler already has open.
-    runner = InsightsRunner(
-            lakeview=lv, 
-            run_storage=run_storage,
-            active_insight_storage=active_insight_storage,
-            insight_storage=insight_record_storage
-        )
-
-    target = schedule.namespace
-    if schedule.table_name:
-        target += f".{schedule.table_name}"
-    print(f"Executing job for target '{target}'")
-
-    if schedule.namespace=="*":
-        runner.run_for_lakehouse(rule_ids=schedule.rules_requested, type="auto")
-    elif schedule.table_name:
-        runner.run_for_table(target, rule_ids=schedule.rules_requested, type="auto")
-    else:
-        runner.run_for_namespace(schedule.namespace, rule_ids=schedule.rules_requested, type="auto")
-
-    print(f"Execution finished for schedule {schedule.id}.")
+import uuid
 
 def run_scheduler_cycle(schedule_storage: StorageInterface ):
     """
@@ -47,7 +20,7 @@ def run_scheduler_cycle(schedule_storage: StorageInterface ):
         "SELECT * FROM jobschedules WHERE is_enabled = TRUE AND next_run_timestamp <= :now_timestamp",
         {"now_timestamp": now}
     )
-
+    lv = LakeView()
     insight_run_storage = get_storage(model=InsightRun)
     insight_run_storage.connect()
     insight_run_storage.ensure_table()
@@ -57,13 +30,57 @@ def run_scheduler_cycle(schedule_storage: StorageInterface ):
     active_insight_storage = get_storage(model=ActiveInsight)
     active_insight_storage.connect()
     active_insight_storage.ensure_table()
+    background_job_storage = get_storage(model=BackgroundJob)
+    background_job_storage.connect()
+    background_job_storage.ensure_table()
+    queued_task_storage = get_storage(model=QueuedTask)
+    queued_task_storage.connect()
+    queued_task_storage.ensure_table()
 
     for schedule in schedules_to_run:
-        print(f"Triggering job for schedule: {schedule.id}")
-        
-        # 2. Trigger the job execution (ideally asynchronously).
-        # This function (defined in the next section) does the actual work.
-        execute_job(schedule, insight_run_storage, insight_record_storage, active_insight_storage) 
+        print(f"Enqueuing tasks for schedule: {schedule.id}")
+
+        # 1. Create a Batch record
+        batch_id = str(uuid.uuid4())
+        new_batch = BackgroundJob( # Re-using BackgroundJob as our JobBatch
+            id=batch_id,
+            namespace=schedule.namespace,
+            table_name=schedule.table_name,
+            rules_requested=schedule.rules_requested,
+            status="pending",
+            details=f"Scheduled run from schedule {schedule.id}"
+        )
+        background_job_storage.save(new_batch)
+
+        # 2. Get list of tables (same logic as API)
+        tables_to_run = []
+        if schedule.namespace == "*":
+            all_namespaces = lv.get_namespaces(include_nested=True)
+            for ns in all_namespaces:
+                tables_to_run.extend(lv.get_tables(ns))
+        elif schedule.table_name:
+            tables_to_run = [f"{schedule.namespace}.{schedule.table_name}"]
+        else:
+            tables_to_run = lv.get_tables(schedule.namespace, recursive=True) # Assuming get_tables can be recursive
+
+        # 3. Create QueuedTask records
+        tasks = []
+        for table_ident in tables_to_run:
+            ns, tbl = get_namespace_and_table_name(table_ident)
+            tasks.append(QueuedTask(
+                batch_id=batch_id,
+                namespace=ns,
+                table_name=tbl,
+                rules_requested=schedule.rules_requested,
+                priority=10, # High priority for manual runs
+                run_type="auto"
+            ))
+
+        if tasks:
+            queued_task_storage.save_many(tasks)
+        else:
+            new_batch.status = "complete"
+            background_job_storage.save(new_batch)
         
         # 3. Update the schedule for its next run.
         base_time = now
@@ -75,6 +92,10 @@ def run_scheduler_cycle(schedule_storage: StorageInterface ):
         print(f"Finished job for schedule: {schedule.id}")
 
     insight_run_storage.disconnect()
+    insight_record_storage.disconnect()
+    active_insight_storage.disconnect()
+    background_job_storage.disconnect()
+    queued_task_storage.disconnect()
 
 if __name__ == "__main__":
     # This loop makes the script run forever.

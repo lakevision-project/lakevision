@@ -7,7 +7,7 @@ from fastapi import Request, HTTPException
 from pyiceberg.table import Table
 from app.lakeviewer import LakeView
 from app.storage import get_storage
-from app.models import BackgroundJob, InsightRun, JobSchedule, InsightRecord, ActiveInsight
+from app.models import BackgroundJob, InsightRun, JobSchedule, InsightRecord, ActiveInsight, QueuedTask
 from app import config
 from app.insights.runner import InsightsRunner
 
@@ -51,6 +51,7 @@ authz_ = authz_class()
 # --- Storage Instances ---
 background_job_storage = get_storage(model=BackgroundJob)
 schedule_storage = get_storage(model=JobSchedule)
+queued_task_storage = get_storage(model=QueuedTask)
 
 # --- Caching ---
 page_session_cache = {}

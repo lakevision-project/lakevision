@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import dataclasses
 from dataclasses import dataclass, field
 import uuid
-
+from enum import Enum
 from pyiceberg.table import FileScanTask
 from pyiceberg.typedef import Record
 
@@ -19,6 +19,33 @@ class RunRequest(BaseModel):
 class RunResponse(BaseModel):
     run_id: str
     message: str = "Job accepted and is running in the background."
+
+class TaskStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETE = "complete"
+    FAILED = "failed"
+
+@dataclass
+class QueuedTask:
+
+    namespace: str
+    table_name: str
+    rules_requested: List[str]
+    batch_id: str
+
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+    status: TaskStatus = field(default=TaskStatus.PENDING)
+    priority: int = field(default=10)
+    run_type: str = field(default="auto")
+
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    started_at: Optional[datetime] = field(default=None)
+    finished_at: Optional[datetime] = field(default=None)
+
+    error_details: Optional[str] = field(default=None)
+    worker_id: Optional[str] = field(default=None)
 
 @dataclass
 class BackgroundJob:

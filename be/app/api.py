@@ -10,7 +10,8 @@ from app.api_utils import CleanJSONResponse
 from app.exceptions import LVException
 from app.dependencies import (
     background_job_storage, schedule_storage,
-    clean_cache, refresh_namespace_and_tables
+    clean_cache, refresh_namespace_and_tables,
+    queued_task_storage
 )
 from app.routers import auth, tables, insights, jobs
 
@@ -26,6 +27,8 @@ async def lifespan(app: FastAPI):
     background_job_storage.ensure_table()
     schedule_storage.connect()
     schedule_storage.ensure_table()
+    queued_task_storage.connect()
+    queued_task_storage.ensure_table()
     
     # Start periodic maintenance tasks
     refresh_namespace_and_tables()
@@ -36,6 +39,7 @@ async def lifespan(app: FastAPI):
     print("Application shutdown...")
     background_job_storage.disconnect()
     schedule_storage.disconnect()
+    queued_task_storage.disconnect()
     print("Shutdown complete.")
 
 # --- FastAPI App Initialization ---

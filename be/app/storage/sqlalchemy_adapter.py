@@ -8,7 +8,7 @@ from sqlalchemy import (TIMESTAMP, Boolean, Column, Float, Integer, MetaData,
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
-
+from contextlib import contextmanager
 from app.storage.interface import AggregateFunction, StorageInterface, T
 
 class SQLAlchemyStorage(StorageInterface[T]):
@@ -40,6 +40,27 @@ class SQLAlchemyStorage(StorageInterface[T]):
         print(f"✅ Initialized SQLAlchemyStorage for model '{model.__name__}'")
         print(f"   Complex fields (JSON): {self._complex_fields}")
         print(f"   Datetime fields (Native): {self._datetime_fields}")
+
+    @contextmanager
+    def db_session(self):
+        """
+        Provides a transactional connection from the engine pool.
+
+        This method is a context manager. It yields a connection
+        wrapped in a 'BEGIN' call. It automatically calls 'COMMIT'
+        on a successful exit or 'ROLLBACK' if an exception occurs.
+        """
+        engine = self._get_engine()
+        with engine.begin() as conn: # This starts the transaction
+            try:
+                yield conn # Yield the connection to the 'with' block
+            except Exception:
+                # The 'engine.begin()' context manager
+                # handles the rollback automatically.
+                # We just re-raise the exception.
+                raise
+        # The transaction is automatically committed here if no exception
+        # The connection is automatically returned to the pool
 
     def connect(self) -> None:
         if not self._engine:
