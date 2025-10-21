@@ -72,6 +72,7 @@ def run_scheduler_cycle(schedule_storage: StorageInterface ):
         schedule.last_run_timestamp = now
         
         schedule_storage.save(schedule) # Save the updated timestamps
+        print(f"Finished job for schedule: {schedule.id}")
 
     insight_run_storage.disconnect()
 
@@ -86,6 +87,7 @@ if __name__ == "__main__":
             schedule_storage.connect()
             schedule_storage.ensure_table()
             run_scheduler_cycle(schedule_storage)
+            print("Finish checking schedules to run")
             time.sleep(600) # Wait for 600 seconds
         except Exception as e:
             logging.error(f"Error running scheduler: {str(e)}")
