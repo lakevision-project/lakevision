@@ -19,6 +19,8 @@ RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 COPY start.sh /app/start.sh
 RUN chmod 755 /app/start.sh
+COPY worker.sh /app/worker.sh
+RUN chmod 755 /app/worker.sh
 #USER lv
 
 FROM be
