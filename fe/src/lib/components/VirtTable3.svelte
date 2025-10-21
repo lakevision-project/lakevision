@@ -185,6 +185,7 @@
 				{#if sortKey === key}
 					{sortOrder === 'asc' ? ' ▲' : ' ▼'}
 				{/if}
+				<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 				<div
 					class="resize-handle"
 					on:mousedown={(event) => handleMouseDown(event, key)}

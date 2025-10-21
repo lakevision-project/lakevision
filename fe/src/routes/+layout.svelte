@@ -22,7 +22,6 @@
 	import { Logout, UserAvatarFilledAlt } from 'carbon-icons-svelte';
 	import Chat from '../lib/components/Chat.svelte';
 
-	export let data;
 	let user;
 	let isHeaderActionOpen = false;
 	let AUTH_ENABLED = false;
