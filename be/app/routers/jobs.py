@@ -29,7 +29,6 @@ def run_insights_job(run_id: str, namespace: str, table_name: str | None, rules:
     target = f"{namespace}.{table_name}" if table_name else namespace
     job.details = f"Processing {len(rules)} rules for '{target}'"
     background_job_storage.save(job)
-    print(job.details)
     run_storage = get_storage(model=InsightRun)
     insights_storage = get_storage(model=InsightRecord)
     active_insights_storage = get_storage(model=ActiveInsight)
@@ -143,12 +142,9 @@ def delete_schedule(schedule_id: str):
 def list_schedules(namespace: str, table_name: Optional[str] = None):
     # If namespace is '*', the criteria is to find schedules
     # where the table_name is not set (is NULL).
-    print(namespace)
     if namespace == "*":
-        print("true")
         criteria = {"table_name": None}
     else:
-        print("false")
         # Otherwise, use the original logic.
         criteria = {"namespace": namespace}
         if table_name:

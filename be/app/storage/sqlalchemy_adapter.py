@@ -272,10 +272,8 @@ class SQLAlchemyStorage(StorageInterface[T]):
         engine = self._get_engine()
         with engine.connect() as conn:
             stmt = text(sql_query)
-            print(stmt)
             # 4. Execute with the correctly built parameters
             results = conn.execute(stmt, params).mappings().all()
-            print(len(results))
 
         deserialized_results = [self._deserialize_row(dict(row)) for row in results]
         return [self.model(**row) for row in deserialized_results]
