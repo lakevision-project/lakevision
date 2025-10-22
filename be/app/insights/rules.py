@@ -1,14 +1,17 @@
 from pyiceberg.table import Table 
 from pyiceberg.types import StructType, ListType, MapType, UUIDType
 from typing import Optional
-from dataclasses import dataclass
 from app.insights.utils import qualified_table_name
 import yaml
 import os
 import pyarrow.compute as pc
-from .common import TableFile
+from app.models import TableFile
 from collections import defaultdict
 from statistics import median
+from typing import Dict
+
+from app.models import Rule
+from app.models import Insight
 
 rules_yaml_path = os.path.join(os.path.dirname(__file__), "rules.yaml")
 
@@ -23,17 +26,7 @@ SKEWED_PARTITION_THRESHOLD_RATIO = 10
 # Load yaml at app startup
 with open(rules_yaml_path) as f:
     INSIGHT_META = yaml.safe_load(f)
-
-@dataclass
-class Insight:
-    code: str
-    table: str
-    message: str
-    severity: str
-    suggested_action: str
-
-
-
+    
 def rule_small_files(table: Table) -> Optional[Insight]:
     files = [file_scan_task.file.file_size_in_bytes for file_scan_task in table.scan().plan_files()]
     if not files:
@@ -221,36 +214,37 @@ def rule_skewed_or_largest_partitions_table(table: Table) -> Optional[Insight]:
                 partition_summary[partition_key]["size_bytes"] += file.size_bytes
 
             partition_list = []
-            for partition_key, summary_values in partition_summary.items():
-                partition_list.append({
-                    "partition_key": partition_key,
-                    "records": summary_values["records"],
-                    "size_bytes": summary_values["size_bytes"]
-                })
+            if len(partition_summary)>0:
+                for partition_key, summary_values in partition_summary.items():
+                    partition_list.append({
+                        "partition_key": partition_key,
+                        "records": summary_values["records"],
+                        "size_bytes": summary_values["size_bytes"]
+                    })
 
-            partitions_size = len(partition_summary)
-            records_by_partition = [v["records"] for v in partition_summary.values()]
-            size_by_partition = [v["size_bytes"] for v in partition_summary.values()]
-            median_records = median(records_by_partition)
-            median_size = median(size_by_partition)
-            # Condition that checks for a significant positive skew in the data. It evaluates to True if the largest value in your dataset is more than X times greater than the median value.
-            skewed_records = max(records_by_partition)/median_records > SKEWED_PARTITION_THRESHOLD_RATIO
-            skewed_size = max(size_by_partition)/median_size > SKEWED_PARTITION_THRESHOLD_RATIO
+                partitions_size = len(partition_summary)
+                records_by_partition = [v["records"] for v in partition_summary.values()]
+                size_by_partition = [v["size_bytes"] for v in partition_summary.values()]
+                median_records = median(records_by_partition)
+                median_size = median(size_by_partition)
+                # Condition that checks for a significant positive skew in the data. It evaluates to True if the largest value in your dataset is more than X times greater than the median value.
+                skewed_records = max(records_by_partition)/median_records > SKEWED_PARTITION_THRESHOLD_RATIO
+                skewed_size = max(size_by_partition)/median_size > SKEWED_PARTITION_THRESHOLD_RATIO
 
-            largest_records = max(records_by_partition)
-            largest_size = max(size_by_partition)
-      
-            meta = INSIGHT_META["SKEWED_OR_LARGEST_PARTITIONS_TABLE"]
-            if skewed_records or skewed_size:
-                return Insight(
-                    code="SKEWED_OR_LARGEST_PARTITIONS_TABLE",
-                    table=qualified_table_name(table.name()),
-                    message=meta["message"].format(partitions=int(partitions_size), skew_ratio=int(SKEWED_PARTITION_THRESHOLD_RATIO), 
-                                                median_size=int(median_size), largest_size=str(largest_size),
-                                                median_records=int(median_records), largest_records=str(largest_records)),
-                    severity=meta["severity"],
-                    suggested_action=meta["suggested_action"]
-                )
+                largest_records = max(records_by_partition)
+                largest_size = max(size_by_partition)
+        
+                meta = INSIGHT_META["SKEWED_OR_LARGEST_PARTITIONS_TABLE"]
+                if skewed_records or skewed_size:
+                    return Insight(
+                        code="SKEWED_OR_LARGEST_PARTITIONS_TABLE",
+                        table=qualified_table_name(table.name()),
+                        message=meta["message"].format(partitions=int(partitions_size), skew_ratio=int(SKEWED_PARTITION_THRESHOLD_RATIO), 
+                                                    median_size=int(median_size), largest_size=str(largest_size),
+                                                    median_records=int(median_records), largest_records=str(largest_records)),
+                        severity=meta["severity"],
+                        suggested_action=meta["suggested_action"]
+                    )
 
         except Exception as e:
             print(str(e))
@@ -270,3 +264,13 @@ ALL_RULES = [
     rule_skewed_or_largest_partitions_table
 ]
 
+ALL_RULES_OBJECT = [
+    Rule("SMALL_FILES", "Many small files", "Table with many small data files could improve performance with fewer, larger files. Use optimize or less partitioning to improve.", rule_small_files),
+    Rule("NO_LOCATION", "No location", "The table has no location set", rule_no_location),
+    Rule("LARGE_FILES", "Large files", "Table with single/avg parquet file size >1GB, leading to large memory overhead and degraded process distribution. Rewrite table with a lower target maximum file size.", rule_large_files),
+    Rule("SMALL_FILES_LARGE_TABLE", "Large table with small files", "Table with <50MB per parquet file and larger than 50GB total. Use optimize or less partitioning to improve.", rule_small_files_large_table),
+    Rule("UUID_COLUMN", "UUID type not universally supported", "UUID column type may not be supported in all environments, especially Spark and older Presto", rule_column_uuid_table),
+    Rule("NO_ROWS_TABLE", "Empty table", "Table has been declared but has no data. Possibly intentional.", rule_no_rows_table),
+    Rule("SNAPSHOT_SPRAWL_TABLE", "Too many snapshots", "A high snapshot count for a table creates memory and process overhead for the catalog service and catalog results processing on clients. Expire snapshots or adjust snapshot age configuration if practical.", rule_too_many_snapshot_table),
+    Rule("SKEWED_OR_LARGEST_PARTITIONS_TABLE", "Large partition", "The table contains one partition that is considerably larger than the rest. Evaluate if the table can be repartitioned by another column/criteria.", rule_skewed_or_largest_partitions_table)
+]
