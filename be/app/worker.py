@@ -83,58 +83,80 @@ def get_atomic_job(task_storage: StorageInterface[QueuedTask]) -> Optional[Queue
     """
     Atomically fetches and locks a single job from the queue.
     This operation is transactional and compatible with Postgres and SQLite.
+    It uses a two-step process to prevent race conditions:
+    1. Reap stale jobs (set 'running' -> 'pending').
+    2. Claim a 'pending' job.
     """
     stale_time = datetime.now(timezone.utc) - timedelta(minutes=JOB_TIMEOUT_MINUTES)
-    
-    query = """
-        SELECT * FROM {table}
-        WHERE (status = :pending_status) OR (status = :running_status AND started_at < :stale_time)
-        ORDER BY priority ASC, created_at ASC
-        LIMIT 1
-    """.format(table=task_storage.table_name)
     
     try:
         # task_storage.db_session() handles the transaction commit/rollback
         with task_storage.db_session() as session:
             
-            # 1. Find a potential job
-            job_to_run_raw = session.execute(text(query), {
+            # 1. --- Reap Stale Jobs ---
+            reap_query = """
+                UPDATE {table}
+                SET status = :pending_status, worker_id = NULL
+                WHERE status = :running_status AND started_at < :stale_time
+            """.format(table=task_storage.table_name)
+            
+            session.execute(text(reap_query), {
                 "pending_status": TaskStatus.PENDING,
                 "running_status": TaskStatus.RUNNING,
                 "stale_time": stale_time
+            })
+
+            # 2. --- Find a Pending Job ---
+            query = """
+                SELECT * FROM {table}
+                WHERE status = :pending_status
+                ORDER BY priority ASC, created_at ASC
+                LIMIT 1
+            """.format(table=task_storage.table_name)
+            
+            job_to_run_raw = session.execute(text(query), {
+                "pending_status": TaskStatus.PENDING
             }).fetchone()
             
             if not job_to_run_raw:
                 return None # No jobs in queue
             
             job_id = job_to_run_raw.id
-            
-            # 2. Attempt to "lock" the job by updating its status.
-            # This version does NOT use 'RETURNING *' to be SQLite compatible.
+
+            # 3. --- Atomically Lock the Job ---
+            # We need to capture the values we are about to write.
+            lock_time = datetime.now(timezone.utc)
+            lock_worker_id = WORKER_ID
+
             update_query = """
                 UPDATE {table}
                 SET status = :running_status, started_at = :now, worker_id = :worker
-                WHERE id = :job_id AND (status = :pending_status OR status = :running_status)
+                WHERE id = :job_id AND status = :pending_status
                 """.format(table=task_storage.table_name) 
             
             update_result = session.execute(text(update_query), {
                 "running_status": TaskStatus.RUNNING,
-                "now": datetime.now(timezone.utc),
-                "worker": WORKER_ID,
+                "now": lock_time,
+                "worker": lock_worker_id,
                 "job_id": job_id,
                 "pending_status": TaskStatus.PENDING
             })
             
-            # 3. Check if we successfully locked the job.
-            # If rowcount is 1, we won the race.
+            # 4. --- Check if we won the race ---
             if update_result.rowcount == 1:
-                
-                # 4. We won. Use the data we fetched in step 1.
-                # We must deserialize it using the adapter's method.
+                # We won. Deserialize the raw data we selected in step 2.
                 raw_data = job_to_run_raw._asdict()
                 deserialized_data = task_storage._deserialize_row(raw_data) 
                 
-                return QueuedTask(**deserialized_data)
+                task_object = QueuedTask(**deserialized_data)
+
+                # We must manually update the in-memory object to match
+                # the values we just wrote to the database.
+                task_object.status = TaskStatus.RUNNING
+                task_object.started_at = lock_time
+                task_object.worker_id = lock_worker_id
+                
+                return task_object
                 
             else:
                 # We "lost" the race. Another worker got the job
