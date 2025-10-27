@@ -189,13 +189,35 @@
 		window.history.replaceState(null, '', url);
 	}
 
+	$: {
+    // This reactive block handles changes triggered by the Namespace ComboBox selection
+		if (browser) {
+			const currentSelectedId = dropdown1_selectedId; // Capture value at start of block run
+			const nsText = formatSelected(currentSelectedId, data.namespaces);
+			const currentStoreValue = get(selectedNamespce);
 
-	$: if (browser) {
-		const nsText = formatSelected(dropdown1_selectedId, data.namespaces);
-		if (nsText && tables.length === 0) {
-			get_tables(nsText);
+			if (nsText) {
+				// A namespace IS selected in the dropdown
+				if (nsText !== currentStoreValue) {
+					// And it's DIFFERENT from the currently active namespace store
+					// console.log(`NS Dropdown changed to: ${nsText}`);
+					get_tables(nsText); // Fetch tables for the new namespace
+									// get_tables updates selectedNamespce store and clears table dropdown ID
+				}
+			} else {
+				// Namespace selection IS CLEARED in the dropdown (selectedId is not valid)
+				if (currentStoreValue !== '') {
+					// Only act if the store wasn't already empty (avoids redundant updates)
+					// console.log('NS Dropdown cleared');
+					selectedNamespce.set('');
+					selectedTable.set('');
+					tables = []; // *** Explicitly clear the tables array for the ComboBox ***
+					dropdown2_selectedId = ''; // Clear the table dropdown's selected ID
+				}
+			}
 		}
 	}
+
 	$: if (browser) {
 		selectedTable.set(formatSelected(dropdown2_selectedId, tables));
 	}
