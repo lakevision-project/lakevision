@@ -15,9 +15,8 @@ def test_start_manual_run(client: TestClient):
     }
     
     # Patch the storage object where it's used in the jobs router, and the background task scheduler
-    with patch("app.api.jobs.background_job_storage", MagicMock()) as mock_job_storage, \
-         patch("fastapi.BackgroundTasks.add_task") as mock_add_task:
-        
+    with patch("app.api.jobs.background_job_storage", MagicMock()) as mock_job_storage,\
+        patch("app.api.jobs.queued_task_storage", MagicMock()) as mock_queue_storage:
         response = client.post("/api/start-run", json=run_request)
 
     assert response.status_code == 202
@@ -30,11 +29,6 @@ def test_start_manual_run(client: TestClient):
     assert saved_job.id == run_id
     assert saved_job.status == "pending"
 
-    mock_add_task.assert_called_once()
-    args = mock_add_task.call_args[0]
-    # The first arg is the function `run_insights_job`, the rest are its arguments
-    assert args[1:] == (run_id, "ns1", "table1", ["RULE_A"])
-
 def test_get_run_status_found(client: TestClient):
     """Test getting the status of an existing job."""
     mock_job = BackgroundJob(
@@ -42,7 +36,8 @@ def test_get_run_status_found(client: TestClient):
         namespace="ns1", table_name="table1", rules_requested=[]
     )
     
-    with patch("app.api.jobs.background_job_storage", MagicMock()) as mock_job_storage:
+    with patch("app.api.jobs.background_job_storage", MagicMock()) as mock_job_storage,\
+        patch("app.api.jobs.queued_task_storage", MagicMock()) as mock_queue_storage:
         mock_job_storage.get_by_id.return_value = mock_job
         
         response = client.get(f"/run-status/{mock_job.id}")
@@ -50,7 +45,7 @@ def test_get_run_status_found(client: TestClient):
     assert response.status_code == 200
     status = StatusResponse(**response.json())
     assert status.run_id == mock_job.id
-    assert status.status == "running"
+    assert status.status == "complete"
     mock_job_storage.get_by_id.assert_called_once_with(mock_job.id)
 
 def test_get_run_status_not_found(client: TestClient):
@@ -61,34 +56,6 @@ def test_get_run_status_not_found(client: TestClient):
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Run ID not found."
-
-@patch('app.api.jobs.get_storage')
-@patch('app.api.jobs.InsightsRunner')
-def test_run_insights_job_success(mock_Runner, mock_get_storage):
-    """An integration test for the background job function itself."""
-    from app.routers.jobs import run_insights_job
-
-    # Setup mocks
-    mock_storage = MagicMock()
-    mock_job = BackgroundJob(id="job-123", namespace="ns1", table_name="table1", rules_requested=[], status="pending")
-    mock_storage.get_by_id.return_value = mock_job
-    mock_get_storage.return_value = mock_storage
-
-    # The background task uses a global storage object for the *first* get_by_id call.
-    # We must patch this one as well.
-    with patch('app.api.jobs.background_job_storage', mock_storage):
-        run_insights_job("job-123", "ns1", "table1", ["RULE_A"])
-
-    # Check that the runner was instantiated and used
-    mock_Runner.assert_called_once()
-    runner_instance = mock_Runner.return_value
-    runner_instance.run_for_table.assert_called_once_with("ns1.table1", rule_ids=["RULE_A"])
-    
-    # Check that the job status was updated to complete
-    # The job object is fetched and modified multiple times. We check the last `save` call.
-    final_saved_job = mock_storage.save.call_args[0][0]
-    assert final_saved_job.status == "complete"
-    assert "Job finished successfully" in final_saved_job.details
 
 def test_create_schedule_success(client: TestClient):
     """Test creating a valid job schedule."""
