@@ -38,11 +38,11 @@ def run_scheduler_cycle(schedule_storage: StorageInterface ):
     queued_task_storage.ensure_table()
 
     for schedule in schedules_to_run:
-        print(f"Enqueuing tasks for schedule: {schedule.id}")
-
+        print(f"Enqueuing generator task for schedule: {schedule.id}")
+        
         # 1. Create a Batch record
         batch_id = str(uuid.uuid4())
-        new_batch = BackgroundJob( # Re-using BackgroundJob as our JobBatch
+        new_batch = BackgroundJob(
             id=batch_id,
             namespace=schedule.namespace,
             table_name=schedule.table_name,
@@ -52,35 +52,19 @@ def run_scheduler_cycle(schedule_storage: StorageInterface ):
         )
         background_job_storage.save(new_batch)
 
-        # 2. Get list of tables (same logic as API)
-        tables_to_run = []
-        if schedule.namespace == "*":
-            all_namespaces = lv.get_namespaces(include_nested=True)
-            for ns in all_namespaces:
-                tables_to_run.extend(lv.get_tables(ns))
-        elif schedule.table_name:
-            tables_to_run = [f"{schedule.namespace}.{schedule.table_name}"]
-        else:
-            tables_to_run = lv.get_tables(schedule.namespace, recursive=True) # Assuming get_tables can be recursive
-
-        # 3. Create QueuedTask records
-        tasks = []
-        for table_ident in tables_to_run:
-            ns, tbl = get_namespace_and_table_name(table_ident)
-            tasks.append(QueuedTask(
-                batch_id=batch_id,
-                namespace=ns,
-                table_name=tbl,
-                rules_requested=schedule.rules_requested,
-                priority=10, # High priority for manual runs
-                run_type="auto"
-            ))
-
-        if tasks:
-            queued_task_storage.save_many(tasks)
-        else:
-            new_batch.status = "complete"
-            background_job_storage.save(new_batch)
+        # 2. Create ONE QueuedTask that mirrors the schedule
+        # If table_name is None, the worker will treat it as a generator.
+        task = QueuedTask(
+            batch_id=batch_id,
+            namespace=schedule.namespace,
+            table_name=schedule.table_name,
+            rules_requested=schedule.rules_requested,
+            priority=10, 
+            run_type="auto"
+        )
+        
+        # 3. Save the single task
+        queued_task_storage.save(task)
         
         # 3. Update the schedule for its next run.
         base_time = now

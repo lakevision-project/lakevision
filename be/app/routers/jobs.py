@@ -18,98 +18,49 @@ from app.models import (
 
 router = APIRouter()
 
-# --- Manual Job Endpoints ---
 @router.post("/api/start-run", response_model=RunResponse, status_code=202)
 def start_manual_run(run_request: RunRequest):
     batch_id = str(uuid.uuid4())
-
+    
     # 1. Create the Batch record
-    new_batch = BackgroundJob( # This is your 'JobBatch'
+    new_batch = BackgroundJob( 
         id=batch_id, 
         namespace=run_request.namespace, 
         table_name=run_request.table_name,
         rules_requested=run_request.rules_requested, 
-        status="pending", # Status is now 'pending' (i.e., enqueued)
-        details="Job is being queued."
+        status="pending",
+        details="Job is queued."
     )
     background_job_storage.save(new_batch)
 
-    # 2. Get the list of tables to run (this logic moves from the runner)
-    tables_to_run = []
-    if run_request.namespace == "*":
-        all_namespaces = lv.get_namespaces(include_nested=True)
-        for ns in all_namespaces:
-            tables_to_run.extend([qualified_table_name(t_ident) for t_ident in lv.get_tables(".".join(ns))])
-    elif run_request.table_name:
-        tables_to_run = [f"{run_request.namespace}.{run_request.table_name}"]
-    else:
-        tables_to_run = [qualified_table_name(t_ident) for t_ident in lv.get_tables(run_request.namespace)]
-
-    # 3. Create an atomic QueuedTask for each table
-    tasks = []
-    for table_ident in tables_to_run:
-        ns, tbl = get_namespace_and_table_name(table_ident)
-        tasks.append(QueuedTask(
+    # 2. Create ONE task to represent the job.    
+    # If a specific table is requested, it's a simple "execution" task
+    if run_request.table_name:
+        task = QueuedTask(
             batch_id=batch_id,
-            namespace=ns,
-            table_name=tbl,
+            namespace=run_request.namespace,
+            table_name=run_request.table_name,
             rules_requested=run_request.rules_requested,
-            priority=1, # High priority for manual runs
+            priority=1,
             run_type="manual"
-        ))
-
-    if tasks:
-        queued_task_storage.save_many(tasks)
+        )
     else:
-        # No tables found, mark batch as complete
-        new_batch.status = "complete"
-        new_batch.details = "No tables found to process."
-        background_job_storage.save(new_batch)
-
-    return RunResponse(run_id=batch_id)
-
-@router.get("/run-status/{run_id}", response_model=StatusResponse)
-def get_run_status(run_id: str): # run_id is now a batch_id
-    batch_job = background_job_storage.get_by_id(run_id)
-    if not batch_job:
-        raise HTTPException(status_code=404, detail="Run ID not found.")
-
-    # Get task statuses
-    # This could be a raw query for efficiency:
-    # SELECT status, COUNT(*) FROM queuedtask WHERE batch_id = :run_id GROUP BY status
-    tasks = queued_task_storage.get_by_attributes({"batch_id": run_id})
-    
-    status_counts = defaultdict(int)
-    for task in tasks:
-        status_counts[task.status] += 1
+        print("not_table")
+        # If a namespace or '*' is requested, it's a "generator" task.
+        # We signify this by setting table_name=None.
+        task = QueuedTask(
+            batch_id=batch_id,
+            namespace=run_request.namespace,
+            table_name=None,
+            rules_requested=run_request.rules_requested,
+            priority=1, 
+            run_type="manual"
+        )
         
-    total_tasks = len(tasks)
-    pending = status_counts[TaskStatus.PENDING]
-    running = status_counts[TaskStatus.RUNNING]
-    complete = status_counts[TaskStatus.COMPLETE]
-    failed = status_counts[TaskStatus.FAILED]
-
-    # Update the overall batch status
-    if total_tasks == 0:
-        batch_job.status = "complete"
-        batch_job.details = "No tasks were generated for this job."
-    elif pending == 0 and running == 0:
-        # All jobs are finished
-        if failed > 0:
-            batch_job.status = "failed"
-            batch_job.details = f"Job finished with {failed} / {total_tasks} tasks failed."
-        else:
-            batch_job.status = "complete"
-            batch_job.details = f"Job finished successfully. ({complete} / {total_tasks} tasks)"
-        batch_job.finished_at = datetime.now(timezone.utc)
-    else:
-        # Job is still going
-        batch_job.status = "running"
-        batch_job.details = f"Processing: {complete} complete, {running} running, {failed} failed, {pending} pending."
-    
-    background_job_storage.save(batch_job) # Save the updated summary
-    
-    return StatusResponse.from_job(batch_job)
+    # 3. Save the single task
+    queued_task_storage.save(task)
+        
+    return RunResponse(run_id=batch_id)
 
 @router.get("/api/jobs/running", response_model=List[StatusResponse])
 def get_running_jobs(namespace: str, table_name: Optional[str] = None):

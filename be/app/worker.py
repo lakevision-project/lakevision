@@ -8,6 +8,7 @@ from app.models import (
     QueuedTask, TaskStatus, InsightRun, InsightRecord, 
     ActiveInsight, BackgroundJob
 )
+from app.insights.utils import get_namespace_and_table_name, qualified_table_name
 from app.lakeviewer import LakeView
 from app.insights.runner import InsightsRunner
 from sqlalchemy import text
@@ -167,44 +168,130 @@ def get_atomic_job(task_storage: StorageInterface[QueuedTask]) -> Optional[Queue
         print(f"Error fetching/locking job: {e}")
         return None
 
-def run_worker_cycle(task_storage, batch_storage, runner):
-    task = get_atomic_job(task_storage)
-    
-    if not task:
-        # No jobs to run, sleep for a bit
-        return False # Indicates no work was done
-
-    print(f"[{WORKER_ID}] Picked up job {task.id} for {task.namespace}.{task.table_name}")
-    
+def execute_table_task(
+    task: QueuedTask, 
+    runner: InsightsRunner
+):
+    """
+    Executes a single table-level insight run.
+    This was the original logic of run_worker_cycle.
+    """
+    print(f"[{WORKER_ID}] Executing job {task.id} for {task.namespace}.{task.table_name}")
     try:
-        # 3. Execute the *actual* work
-        # We only call run_for_table, as all jobs are now at the table level.
         runner.run_for_table(
             table_identifier=f"{task.namespace}.{task.table_name}",
             rule_ids=task.rules_requested,
             type=task.run_type
         )
-        
-        # 4. Mark as complete
         task.status = TaskStatus.COMPLETE
-        task.finished_at = datetime.now(timezone.utc)
         task.error_details = None
         
     except Exception as e:
-        # 5. Mark as failed
         print(f"[{WORKER_ID}] Job {task.id} FAILED: {e}")
         traceback.print_exc()
         task.status = TaskStatus.FAILED
-        task.finished_at = datetime.now(timezone.utc)
         task.error_details = traceback.format_exc()
         
     finally:
-        # 6. Save the final state
-        task_storage.save(task)
-        update_batch_status(task.batch_id, task_storage, batch_storage)
-        print(f"[{WORKER_ID}] Finished job {task.id} with status {task.status}")
-        return True # Indicates work was done
+        task.finished_at = datetime.now(timezone.utc)
+        print(f"[{WORKER_ID}] Finished table task {task.id} with status {task.status}")
 
+
+def execute_generator_task(
+    task: QueuedTask, 
+    task_storage: StorageInterface[QueuedTask], 
+    lv: LakeView
+):
+    """
+    Generates and enqueues all child tasks for a namespace or '*' job.
+    """
+    print(f"[{WORKER_ID}] Generating child tasks for job {task.id} (Namespace: {task.namespace})")
+    try:
+        # 1. Find all tables (this is the slow part)
+        tables_to_run = []
+        if task.namespace == "*":
+            all_namespaces = lv.get_namespaces(include_nested=True)
+            for ns in all_namespaces:
+                tables_to_run.extend([qualified_table_name(t_ident) for t_ident in lv.get_tables(".".join(ns))])
+        else:
+            # Assuming lv.get_tables can be recursive
+            tables_to_run = [qualified_table_name(t_ident) for t_ident in lv.get_tables(task.namespace)]
+
+        print(f"Found {len(tables_to_run)} tables for job {task.id}.")
+
+        # 2. Create new QueuedTask records
+        new_child_tasks = []
+        for table_ident in tables_to_run:
+            # Use your helper to get clean names
+            ns, tbl = get_namespace_and_table_name(table_ident)
+            
+            new_child_tasks.append(QueuedTask(
+                batch_id=task.batch_id,
+                namespace=ns,
+                table_name=tbl,
+                rules_requested=task.rules_requested,
+                priority=task.priority, # Inherit priority
+                run_type=task.run_type    # Inherit run type
+                # All other fields get defaults (new ID, PENDING status, etc.)
+            ))
+        print(f"have list of new tasks {len(new_child_tasks)}")
+        # 3. Save new tasks to the queue
+        if new_child_tasks:
+            # This could be a large save, but it's happening in the worker,
+            # not blocking the API.
+            task_storage.save_many(new_child_tasks)
+            print(f"Enqueued {len(new_child_tasks)} child tasks for batch {task.batch_id}.")
+        
+        task.status = TaskStatus.COMPLETE
+        task.error_details = None
+
+    except Exception as e:
+        print(f"[{WORKER_ID}] Generator task {task.id} FAILED: {e}")
+        traceback.print_exc()
+        task.status = TaskStatus.FAILED
+        task.error_details = traceback.format_exc()
+        
+    finally:
+        task.finished_at = datetime.now(timezone.utc)
+        print(f"[{WORKER_ID}] Finished generator task {task.id} with status {task.status}")
+
+
+def run_worker_cycle(
+    task_storage: StorageInterface[QueuedTask], 
+    batch_storage: StorageInterface[BackgroundJob],
+    runner: InsightsRunner,
+    lv: LakeView
+):
+    # 1. Get a job (could be generator or table task)
+    task = get_atomic_job(task_storage)
+    
+    if not task:
+        return False # No work done
+
+    try:
+        # 2. Decide what kind of task it is
+        if task.table_name is not None:
+            # It's an "execution task"
+            execute_table_task(task, runner)
+        else:
+            # It's a "generator task" (table_name is None)
+            execute_generator_task(task, task_storage, lv)
+            
+    except Exception as e:
+        # This is a safety net, but execute functions have their own try/except
+        print(f"[{WORKER_ID}] Critical error in worker cycle for task {task.id}: {e}")
+        task.status = TaskStatus.FAILED
+        task.error_details = traceback.format_exc()
+        task.finished_at = datetime.now(timezone.utc)
+        
+    finally:
+        # 3. Save the final state OF THIS TASK (generator or table)
+        task_storage.save(task)
+        
+        # 4. Check if the *entire batch* is complete
+        update_batch_status(task.batch_id, task_storage, batch_storage)
+
+        return True # Indicates work was done
 if __name__ == "__main__":
     print(f"Starting worker process {WORKER_ID}")
     
@@ -229,6 +316,8 @@ if __name__ == "__main__":
     task_storage.ensure_table()
     batch_storage.ensure_table()
     
+    lv = LakeView()
+
     # Create a single runner instance
     runner = InsightsRunner(
         lakeview=LakeView(),
@@ -240,7 +329,7 @@ if __name__ == "__main__":
     # This is the worker's main loop. It runs *fast*.
     while True:
         try:
-            work_done = run_worker_cycle(task_storage, batch_storage, runner)
+            work_done = run_worker_cycle(task_storage, batch_storage, runner, lv)
             if not work_done:
                 # No jobs found, sleep longer to avoid spamming the DB
                 time.sleep(5) # Poll every 5 seconds
