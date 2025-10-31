@@ -75,6 +75,13 @@ test-be:
 	$(CHECK_VENV)
 	cd be && PYTHONPATH=app ../$(VENV_PYTHON) -m pytest tests
 
+# --- Worker ---
+
+.PHONY: run-worker
+run-worker:
+	$(CHECK_VENV)
+	cd be && set -a && source ../.env && set +a && PYTHONPATH=app ../$(VENV_PYTHON) -m app.worker
+
 # --- Scheduler ---
 
 .PHONY: run-scheduler

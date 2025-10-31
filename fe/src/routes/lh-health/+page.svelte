@@ -682,7 +682,7 @@
                             <Tag type="{row.is_enabled ? 'green' : 'gray'}"
                                 >{row.is_enabled ? 'Enabled' : 'Disabled'}</Tag
                             >
-                        {:else if columnKey === 'Next Job'}
+                        {:else if columnKey === 'Next Run'}
                             {@html highlightMatch(new Date(row.next_run_timestamp).toLocaleString(), searchQuery)}
                         {:else}
                             {@html highlightMatch(row[columnKey.toLowerCase().replace(/ /g, '_')], searchQuery)}

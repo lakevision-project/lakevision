@@ -220,40 +220,6 @@ def test_run_for_table(run_storage_mock, insight_storage_mock, active_insight_st
     assert len(saved_active) == expected_insight_count
     assert saved_active[0].last_seen_run_id == saved_run.id
 
-def test_run_for_namespace(run_storage_mock, insight_storage_mock, active_insight_storage_mock):
-    lakeview = MockLakeView()
-    runner = create_mock_runner(lakeview, run_storage_mock, insight_storage_mock, active_insight_storage_mock)
-    table_names = [t.split('.')[-1] for t in lakeview.get_tables("namespace1")]
-    mock_name_tuples = [("namespace1", name) for name in table_names]
-    with patch("app.insights.runner.ALL_RULES_OBJECT", mock_rules_list):
-        with patch("app.insights.runner.get_namespace_and_table_name", side_effect=mock_name_tuples):
-            runner.run_for_namespace("namespace1")
-    assert run_storage_mock.save.call_count == 6
-    assert active_insight_storage_mock.delete_by_attributes.call_count == 6
-    assert insight_storage_mock.save_many.call_count == 6
-    assert active_insight_storage_mock.save_many.call_count == 6
-    saved_runs = [call.args[0] for call in run_storage_mock.save.call_args_list]
-    results_from_storage = {f"{run.namespace}.{run.table_name}": run for run in saved_runs}
-    assert "namespace1.table1" in results_from_storage
-    assert "namespace1.table6" in results_from_storage
-
-def test_run_for_lakehouse(run_storage_mock, insight_storage_mock, active_insight_storage_mock):
-    lakeview = MockLakeView()
-    runner = create_mock_runner(lakeview, run_storage_mock, insight_storage_mock, active_insight_storage_mock)
-    table_names = [t.split('.')[-1] for t in lakeview.get_tables("namespace1")]
-    mock_name_tuples = [("namespace1", name) for name in table_names]
-    with patch("app.insights.runner.ALL_RULES_OBJECT", mock_rules_list):
-        with patch("app.insights.runner.get_namespace_and_table_name", side_effect=mock_name_tuples):
-            runner.run_for_lakehouse()
-    assert run_storage_mock.save.call_count == 6
-    assert active_insight_storage_mock.delete_by_attributes.call_count == 6
-    assert insight_storage_mock.save_many.call_count == 6
-    assert active_insight_storage_mock.save_many.call_count == 6
-    saved_runs = [call.args[0] for call in run_storage_mock.save.call_args_list]
-    results_from_storage = {f"{run.namespace}.{run.table_name}": run for run in saved_runs}
-    assert "namespace1.table1" in results_from_storage
-    assert "namespace1.table6" in results_from_storage
-
 @pytest.mark.parametrize("schema,expected", [
         (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=UUIDType())), True),
         (Schema(NestedField(field_id=1, name="field_1", field_type=StringType()),NestedField(field_id=2, name="field_2", field_type=StringType())), False),

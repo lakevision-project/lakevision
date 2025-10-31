@@ -1,13 +1,10 @@
 from typing import List, Dict, Any, Optional, Set
 from collections import defaultdict
 
-from app.insights.rules import ALL_RULES_OBJECT, INSIGHT_META
-from app.insights.utils import qualified_table_name, get_namespace_and_table_name
-from app.models import Insight, InsightRun, InsightRecord, JobSchedule, InsightRunOut, ActiveInsight, InsightOccurrence, RuleSummaryOut
-from app.lakeviewer import LakeView
+from app.insights.rules import ALL_RULES_OBJECT
+from app.insights.utils import get_namespace_and_table_name
+from app.models import Insight, InsightRun, InsightRecord, InsightRunOut, ActiveInsight, InsightOccurrence, RuleSummaryOut
 from app.storage.interface import StorageInterface
-from sqlalchemy import text, bindparam
-
 class InsightsRunner:
     def __init__(self, lakeview, 
                  run_storage: StorageInterface[InsightRun], 
@@ -170,26 +167,3 @@ class InsightsRunner:
             self.active_insight_storage.save_many(new_active_insights)
 
         return run_result
-
-    def run_for_namespace(self, namespace: str, rule_ids: List[str] = None, recursive: bool = True, type: str = "manual") -> Dict[str, List[Insight]]:
-        print(f"Running job for namespace {namespace}")
-        tables = self.lakeview.get_tables(namespace)
-        results = []
-        for t_ident in tables:
-            qualified = qualified_table_name(t_ident)
-            results.extend(self.run_for_table(qualified, rule_ids, type))
-        if recursive:
-            nested_namespaces = self.lakeview._get_nested_namespaces(namespace)
-            for ns in nested_namespaces:
-                ns_str = ".".join(ns)
-                results.extend(self.run_for_namespace(ns_str, rule_ids, recursive=False, type=type))
-        return results
-
-    def run_for_lakehouse(self, rule_ids: List[str] = None, type: str = "manual") -> Dict[str, List[Insight]]:
-        print("Running job for lakehouse")
-        namespaces = self.lakeview.get_namespaces(include_nested=False)
-        results = []
-        for ns in namespaces:
-            ns_str = ".".join(ns) if isinstance(ns, (tuple, list)) else str(ns)
-            results.extend(self.run_for_namespace(ns_str, rule_ids, recursive=True, type=type))
-        return results
