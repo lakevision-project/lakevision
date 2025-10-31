@@ -66,14 +66,20 @@
 		clearQueryParamsOnce();
 		}
 
-	onMount(() => {
-		initFromQuery();       // handles direct loads
-		});
 
 	afterNavigate(() => {
-		// Handles the return from login (URL now has the right params)
-		initFromQuery();
-		});
+		// Handles all navigations, including first load and param changes
+		if ($page.url.searchParams.has('namespace')) {
+			// If the URL has params, try to initialize.
+			// The initializedFromQuery flag will prevent re-running if it just ran.
+			initFromQuery();
+		} else {
+			// If the URL *doesn't* have params (e.g., after clearQueryParamsOnce()
+			// or navigating to '/'), reset the flag so the *next*
+			// param navigation will work.
+			initializedFromQuery = false;
+		}
+	});
 
 	export let data;
 	let isSideNavOpen = true;
