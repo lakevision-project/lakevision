@@ -62,6 +62,49 @@ def start_manual_run(run_request: RunRequest):
         
     return RunResponse(run_id=batch_id)
 
+@router.get("/run-status/{run_id}", response_model=StatusResponse)
+def get_run_status(run_id: str): # run_id is now a batch_id
+    batch_job = background_job_storage.get_by_id(run_id)
+    if not batch_job:
+        raise HTTPException(status_code=404, detail="Run ID not found.")
+
+    # Get task statuses
+    # This could be a raw query for efficiency:
+    # SELECT status, COUNT(*) FROM queuedtask WHERE batch_id = :run_id GROUP BY status
+    tasks = queued_task_storage.get_by_attributes({"batch_id": run_id})
+    
+    status_counts = defaultdict(int)
+    for task in tasks:
+        status_counts[task.status] += 1
+        
+    total_tasks = len(tasks)
+    pending = status_counts[TaskStatus.PENDING]
+    running = status_counts[TaskStatus.RUNNING]
+    complete = status_counts[TaskStatus.COMPLETE]
+    failed = status_counts[TaskStatus.FAILED]
+
+    # Update the overall batch status
+    if total_tasks == 0:
+        batch_job.status = "complete"
+        batch_job.details = "No tasks were generated for this job."
+    elif pending == 0 and running == 0:
+        # All jobs are finished
+        if failed > 0:
+            batch_job.status = "failed"
+            batch_job.details = f"Job finished with {failed} / {total_tasks} tasks failed."
+        else:
+            batch_job.status = "complete"
+            batch_job.details = f"Job finished successfully. ({complete} / {total_tasks} tasks)"
+        batch_job.finished_at = datetime.now(timezone.utc)
+    else:
+        # Job is still going
+        batch_job.status = "running"
+        batch_job.details = f"Processing: {complete} complete, {running} running, {failed} failed, {pending} pending."
+    
+    background_job_storage.save(batch_job) # Save the updated summary
+    
+    return StatusResponse.from_job(batch_job)
+
 @router.get("/api/jobs/running", response_model=List[StatusResponse])
 def get_running_jobs(namespace: str, table_name: Optional[str] = None):
     criteria = {"namespace": namespace, "status": ["pending", "running"]}
