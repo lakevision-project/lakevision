@@ -297,7 +297,7 @@ if __name__ == "__main__":
     print(f"Starting worker process {WORKER_ID}")
 
     # --- ADD THIS CHECK ---
-    if not get_bool_env('LAKEVISION_HEALTH_ENABLED'):
+    if not get_bool_env('PUBLIC_HEALTH_ENABLED'):
         print("Health feature is disabled. Worker will not run.")
         exit()  # Exit the script immediately
     

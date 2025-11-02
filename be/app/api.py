@@ -11,7 +11,8 @@ from app.exceptions import LVException
 from app.dependencies import (
     background_job_storage, schedule_storage,
     clean_cache, refresh_namespace_and_tables,
-    queued_task_storage
+    queued_task_storage,
+    insight_run_storage, insight_record_storage, active_insight_storage
 )
 from app.routers import auth, tables, insights, jobs
 
@@ -35,6 +36,13 @@ async def lifespan(app: FastAPI):
         schedule_storage.ensure_table()
         queued_task_storage.connect()
         queued_task_storage.ensure_table()
+
+        insight_run_storage.connect()
+        insight_run_storage.ensure_table()
+        insight_record_storage.connect()
+        insight_record_storage.ensure_table()
+        active_insight_storage.connect()
+        active_insight_storage.ensure_table()
     
     # Start periodic maintenance tasks
     refresh_namespace_and_tables()
@@ -47,6 +55,10 @@ async def lifespan(app: FastAPI):
         background_job_storage.disconnect()
         schedule_storage.disconnect()
         queued_task_storage.disconnect()
+
+        insight_run_storage.disconnect()
+        insight_record_storage.disconnect()
+        active_insight_storage.disconnect()
     print("Shutdown complete.")
 
 # --- FastAPI App Initialization ---

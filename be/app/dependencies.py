@@ -14,35 +14,6 @@ from app.insights.runner import InsightsRunner
 # --- Service Instances ---
 lv = LakeView()
 
-def get_runner():
-    """
-    FastAPI Dependency to provide a configured InsightsRunner.
-    This manages the database connection lifecycle for a single request.
-    """
-    # 1. Create the storage instance
-    storage = get_storage(model=InsightRun)
-    insights_storage = get_storage(model=InsightRecord)
-    active_insights_storage = get_storage(model=ActiveInsight)
-    try:
-        # 2. Connect to the database
-        storage.connect()
-        storage.ensure_table()
-        insights_storage.connect()
-        insights_storage.ensure_table()
-        active_insights_storage.connect()
-        active_insights_storage.ensure_table()
-        # 3. Create the runner with its dependencies
-        runner = InsightsRunner(lakeview=lv, run_storage=storage, insight_storage=insights_storage, active_insight_storage=active_insights_storage)
-        # 4. Yield the runner to the endpoint function
-        yield runner
-    finally:
-        # 5. This code runs after the response is sent, ensuring
-        #    the connection is always closed.
-        storage.disconnect()
-        insights_storage.disconnect()
-        active_insights_storage.disconnect()
-
-
 # --- Authorization ---
 authz_module = importlib.import_module(config.AUTHZ_MODULE)
 authz_class = getattr(authz_module, config.AUTHZ_CLASS)
@@ -52,6 +23,40 @@ authz_ = authz_class()
 background_job_storage = get_storage(model=BackgroundJob)
 schedule_storage = get_storage(model=JobSchedule)
 queued_task_storage = get_storage(model=QueuedTask)
+insight_run_storage = get_storage(model=InsightRun)
+insight_record_storage = get_storage(model=InsightRecord)
+active_insight_storage = get_storage(model=ActiveInsight)
+
+def get_runner():
+    """
+    FastAPI Dependency to provide a configured InsightsRunner
+    within a proper database session/transaction.
+    """
+    # 1. Create the storage instance - REMOVED
+    # 2. Connect to the database - MOVED TO API.PY
+    
+    # We now use db_session() for the request's unit of work,
+    # just like get_atomic_job does in worker.py.
+    try:
+        with insight_run_storage.db_session(), \
+             insight_record_storage.db_session(), \
+             active_insight_storage.db_session():
+            
+            # 3. Create the runner (this is cheap)
+            runner = InsightsRunner(
+                lakeview=lv, 
+                run_storage=insight_run_storage, 
+                insight_storage=insight_record_storage,
+                active_insight_storage=active_insight_storage
+            )
+            # 4. Yield the runner to the endpoint function
+            yield runner
+            
+    except Exception as e:
+        # 5. This block catches errors during the session
+        logging.error(f"Error in get_runner DB session: {e}")
+        # The 'with' block will handle rollback.
+        raise HTTPException(status_code=500, detail="Database session error")
 
 # --- Caching ---
 page_session_cache = {}
