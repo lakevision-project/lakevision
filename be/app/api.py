@@ -18,10 +18,10 @@ from app.routers import auth, tables, insights, jobs
 # --- Logging Configuration ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-# Check if the LAKEVISION_HEALTH_ENABLED is set to true.
-HEALTH_ENABLED = get_bool_env('LAKEVISION_HEALTH_ENABLED')
+# Check if the PUBLIC_HEALTH_ENABLED is set to true.
+HEALTH_ENABLED = get_bool_env('PUBLIC_HEALTH_ENABLED')
 if not HEALTH_ENABLED:
-    logging.warning("LAKEVISION_HEALTH_ENABLED is not set to 'true'. Health check and job scheduling features will be disabled.")
+    logging.warning("PUBLIC_HEALTH_ENABLED is not set to 'true'. Health check and job scheduling features will be disabled.")
 
 # --- Application Lifespan (Startup/Shutdown Events) ---
 @asynccontextmanager

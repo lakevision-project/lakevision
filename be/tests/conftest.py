@@ -14,7 +14,7 @@ os.environ['LAKEVISION_DATABASE_URL'] = 'sqlite:///:memory:'
 os.environ['PYICEBERG_CATALOG__DEFAULT__URI'] = 'sqlite:///:memory:'
 os.environ['AUTH_ENABLED'] = 'False' # Disable auth globally for tests unless overridden
 os.environ['SECRET_KEY'] = 'test-secret-key-for-sessions' # Needed for session middleware
-os.environ['LAKEVISION_HEALTH_ENABLED'] = 'true' # Enable Health globally for tests
+os.environ['PUBLIC_HEALTH_ENABLED'] = 'true' # Enable Health globally for tests
 
 @pytest.fixture(scope='session', autouse=True)
 def mock_global_dependencies():

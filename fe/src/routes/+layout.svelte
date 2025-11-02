@@ -77,7 +77,8 @@
 			}
 			CHAT_ENABLED = true;
 		}
-		if (env.LAKEVISION_HEALTH_ENABLED == 'true') {
+
+		if (env.PUBLIC_HEALTH_ENABLED == 'true') {
             healthEnabled.set(true);
         } else {
             healthEnabled.set(false);

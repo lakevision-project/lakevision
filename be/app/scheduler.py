@@ -87,7 +87,7 @@ if __name__ == "__main__":
     # In production, you'd use a real daemon or a cron job to run it.
     print("Starting scheduler process")
 
-    if not get_bool_env('LAKEVISION_HEALTH_ENABLED'):
+    if not get_bool_env('PUBLIC_HEALTH_ENABLED'):
         print("Health feature is disabled. Scheduler will not run.")
         exit()  # Exit the script immediately
 

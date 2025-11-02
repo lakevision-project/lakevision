@@ -14,7 +14,7 @@ def get_storage(
     Factory to select a model-aware storage backend.
     """
     # Check the feature flag first
-    if not get_bool_env('LAKEVISION_HEALTH_ENABLED'):
+    if not get_bool_env('PUBLIC_HEALTH_ENABLED'):
         return NoOpStorage(model) # Return the dummy object
 
     # If health is enabled, THEN proceed to get the DB URL
