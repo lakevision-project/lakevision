@@ -26,6 +26,7 @@
     import { Renew, Run, Calendar, WarningAltFilled, CheckmarkFilled, Information , ChevronRight, ChevronDown} from 'carbon-icons-svelte';
     import VirtualTable from '$lib/components/VirtTable3.svelte';
     import '@carbon/charts-svelte/styles.css';
+    import { healthEnabled, HEALTH_DISABLED_MESSAGE } from '$lib/stores';
 
     // --- State for the three tabs ---
     let insightsSubTab = 0;
@@ -167,17 +168,19 @@
 
     // --- Data Fetching ---
     onMount(() => {
-        fetchOverviewData();
-        fetchRunningJobs();
-        fetchSchedules();
-        if (allRules.length === 0) fetchAllRules();
-        if (allNamespaces.length === 0) fetchAllNamespaces();
+        if ($healthEnabled) {
+            fetchOverviewData();
+            fetchRunningJobs();
+            fetchSchedules();
+            if (allRules.length === 0) fetchAllRules();
+            if (allNamespaces.length === 0) fetchAllNamespaces();
+        }
     });
 
     $: {
         completedRunsLimit;
         showEmptyResults;
-        if (browser) {
+        if (browser && $healthEnabled) {
             fetchLatestInsights();
         }
     }
@@ -419,388 +422,396 @@
         scheduleModalSelectedNsId = '*';
     }
 </script>
+{#if $healthEnabled}
+    <Content>
+        {#if toastProps.open}
+            <ToastNotification
+                kind="{toastProps.kind}"
+                title="{toastProps.title}"
+                subtitle="{toastProps.subtitle}"
+                caption="{new Date().toLocaleString()}"
+                on:close="{() => (toastProps.open = false)}"
+                style="position: fixed; top: 10%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; min-width: 300px;"
+            />
+        {/if}
 
-<Content>
-    {#if toastProps.open}
-        <ToastNotification
-            kind="{toastProps.kind}"
-            title="{toastProps.title}"
-            subtitle="{toastProps.subtitle}"
-            caption="{new Date().toLocaleString()}"
-            on:close="{() => (toastProps.open = false)}"
-            style="position: fixed; top: 10%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; min-width: 300px;"
-        />
-    {/if}
+        <div class="header-container">
+            <h1>Lakehouse Health</h1>
+            <ButtonSet>
+                <Button icon="{Run}" on:click="{() => {
+                    manualRunData.rules_requested = allRules.map(rule => rule.id);
+                    runModalSelectedNsId = '*'; // Set default ID
+                    openRunModal = true;
+                }}">Run Health Check</Button>
+                <Button icon="{Calendar}" kind="secondary" on:click="{() => {
+                    scheduleRunData.rules_requested = allRules.map(rule => rule.id);
+                    scheduleModalSelectedNsId = '*'; // Set default ID
+                    openScheduleModal = true;
+                }}">Schedule Health Check</Button>
+                <Button kind="ghost" class="cds--btn--icon-only" icon="{Renew}" iconDescription="Refresh All Data" on:click="{() => { fetchOverviewData();fetchLatestInsights(); fetchRunningJobs(); fetchSchedules(); }}"/>
+            </ButtonSet>
+        </div>
 
-    <div class="header-container">
-        <h1>Lakehouse Health</h1>
-        <ButtonSet>
-            <Button icon="{Run}" on:click="{() => {
-                manualRunData.rules_requested = allRules.map(rule => rule.id);
-                runModalSelectedNsId = '*'; // Set default ID
-                openRunModal = true;
-            }}">Run Health Check</Button>
-            <Button icon="{Calendar}" kind="secondary" on:click="{() => {
-                scheduleRunData.rules_requested = allRules.map(rule => rule.id);
-                scheduleModalSelectedNsId = '*'; // Set default ID
-                openScheduleModal = true;
-            }}">Schedule Health Check</Button>
-            <Button kind="ghost" class="cds--btn--icon-only" icon="{Renew}" iconDescription="Refresh All Data" on:click="{() => { fetchOverviewData();fetchLatestInsights(); fetchRunningJobs(); fetchSchedules(); }}"/>
-        </ButtonSet>
-    </div>
+        <Tabs bind:selected="{insightsSubTab}" style="margin-top: 1rem;">
+            <Tab label="Overview" />
+            <Tab label="Completed Jobs" />
+            <Tab label="In-Progress Jobs" />
+            <Tab label="Scheduled Jobs" />
+        </Tabs>
+        <div class="tab-content-container">
+            {#if insightsSubTab === 0}
+                <div class="overview-controls">
+                    <Search
+                        placeholder="Filter by rule, namespace, or table name..."
+                        bind:value="{overviewSearchTerm}"
+                    />
+                </div>
 
-    <Tabs bind:selected="{insightsSubTab}" style="margin-top: 1rem;">
-        <Tab label="Overview" />
-        <Tab label="Completed Jobs" />
-        <Tab label="In-Progress Jobs" />
-        <Tab label="Scheduled Jobs" />
-    </Tabs>
-    <div class="tab-content-container">
-        {#if insightsSubTab === 0}
-            <div class="overview-controls">
-                <Search
-                    placeholder="Filter by rule, namespace, or table name..."
-                    bind:value="{overviewSearchTerm}"
-                />
-            </div>
-
-            {#if overviewLoading}
-                <DataTableSkeleton rowCount="{5}" columnCount="{1}" />
-            {:else if Object.keys(groupedOverviewData).length === 0}
-                <p>
-                    {#if overviewSearchTerm}
-                        No active insights match your filter criteria.
-                    {:else}
-                        No active insights found across the lakehouse. Great job!
-                    {/if}
-                </p>
-            {:else}
-                <Accordion>
-                    {#each Object.entries(groupedOverviewData).sort(([, ruleA], [, ruleB]) => {
-                        const severityValueA = severityOrder[ruleA.highestSeverity.toLowerCase()] || 0;
-                        const severityValueB = severityOrder[ruleB.highestSeverity.toLowerCase()] || 0;
-                        return severityValueB - severityValueA; // Sort descending
-                    }) as [ruleName, ruleData] (ruleName)}
-                        <AccordionItem open>
-                            <svelte:fragment slot="title">
-                                <div class="accordion-title-container">
-                                    <div class="rule-title-with-icon">
-                                        {#if ruleData.highestSeverity === 'warning'}
-                                            <WarningAltFilled size="{20}" style="color: #ff832b;" />
-                                        {:else if ruleData.highestSeverity === 'critical'}
-                                            <WarningAltFilled size="{20}" style="color: #da1e28;" />
-                                        {:else}
-                                            <Information size="{20}" style="color: #0f62fe;" />
-                                        {/if}
-                                        <span>{ruleName}</span>
-                                    </div>
-                                    <Tag type="gray">{Object.keys(ruleData.namespaces).length} namespaces</Tag>
-                                </div>
-                            </svelte:fragment>
-                            
-                            <div class="accordion-content">
-                                <p class="suggested-action">
-                                    <strong>Suggested Action:</strong> {ruleData.suggested_action}
-                                </p>
-
-                                <div class="custom-accordion-container">
-                                    {#each Object.entries(ruleData.namespaces) as [namespace, tables] (namespace)}
-                                        {@const namespaceKey = `${ruleName}-${namespace}`}
-                                        {@const isOpen = !!expandedNamespaces[namespaceKey]}
-                                        <div class="custom-accordion-item">
-                                            <button
-                                                class="custom-accordion-title"
-                                                on:click={() => {
-                                                    expandedNamespaces[namespaceKey] = !isOpen;
-                                                    expandedNamespaces = expandedNamespaces;
-                                                }}
-                                                aria-expanded={isOpen}
-                                            >
-                                            {#if isOpen}
-                                                <ChevronRight/>
+                {#if overviewLoading}
+                    <DataTableSkeleton rowCount="{5}" columnCount="{1}" />
+                {:else if Object.keys(groupedOverviewData).length === 0}
+                    <p>
+                        {#if overviewSearchTerm}
+                            No active insights match your filter criteria.
+                        {:else}
+                            No active insights found across the lakehouse. Great job!
+                        {/if}
+                    </p>
+                {:else}
+                    <Accordion>
+                        {#each Object.entries(groupedOverviewData).sort(([, ruleA], [, ruleB]) => {
+                            const severityValueA = severityOrder[ruleA.highestSeverity.toLowerCase()] || 0;
+                            const severityValueB = severityOrder[ruleB.highestSeverity.toLowerCase()] || 0;
+                            return severityValueB - severityValueA; // Sort descending
+                        }) as [ruleName, ruleData] (ruleName)}
+                            <AccordionItem open>
+                                <svelte:fragment slot="title">
+                                    <div class="accordion-title-container">
+                                        <div class="rule-title-with-icon">
+                                            {#if ruleData.highestSeverity === 'warning'}
+                                                <WarningAltFilled size="{20}" style="color: #ff832b;" />
+                                            {:else if ruleData.highestSeverity === 'critical'}
+                                                <WarningAltFilled size="{20}" style="color: #da1e28;" />
                                             {:else}
-                                                <ChevronDown/>
+                                                <Information size="{20}" style="color: #0f62fe;" />
                                             {/if}
-                                                <div class="accordion-title-container">
-                                                    <span>{namespace}</span>
-                                                    <Tag type="gray">{tables.length} tables</Tag>
-                                                </div>
-                                            </button>
+                                            <span>{ruleName}</span>
+                                        </div>
+                                        <Tag type="gray">{Object.keys(ruleData.namespaces).length} namespaces</Tag>
+                                    </div>
+                                </svelte:fragment>
+                                
+                                <div class="accordion-content">
+                                    <p class="suggested-action">
+                                        <strong>Suggested Action:</strong> {ruleData.suggested_action}
+                                    </p>
 
-                                            {#if isOpen}
-                                                <div class="custom-accordion-content">
-                                                    <div class="table-list">
-                                                        {#each tables as table}
-                                                            <div class="table-list-item">
-                                                                <div class="table-list-header">
-                                                                    <a href="/?namespace={namespace}&table={table.table_name}" class="table-link">
-                                                                        <strong>{table.table_name}</strong>
-                                                                    </a>
-                                                                    </div>
-                                                                <p class="table-message">{table.message}</p>
-                                                                <p class="table-timestamp">
-                                                                    Last seen: {new Date(table.timestamp).toLocaleString()}
-                                                                </p>
+                                    <div class="custom-accordion-container">
+                                        {#each Object.entries(ruleData.namespaces) as [namespace, tables] (namespace)}
+                                            {@const namespaceKey = `${ruleName}-${namespace}`}
+                                            {@const isOpen = !!expandedNamespaces[namespaceKey]}
+                                            <div class="custom-accordion-item">
+                                                <button
+                                                    class="custom-accordion-title"
+                                                    on:click={() => {
+                                                        expandedNamespaces[namespaceKey] = !isOpen;
+                                                        expandedNamespaces = expandedNamespaces;
+                                                    }}
+                                                    aria-expanded={isOpen}
+                                                >
+                                                {#if isOpen}
+                                                    <ChevronRight/>
+                                                {:else}
+                                                    <ChevronDown/>
+                                                {/if}
+                                                    <div class="accordion-title-container">
+                                                        <span>{namespace}</span>
+                                                        <Tag type="gray">{tables.length} tables</Tag>
+                                                    </div>
+                                                </button>
+
+                                                {#if isOpen}
+                                                    <div class="custom-accordion-content">
+                                                        <div class="table-list">
+                                                            {#each tables as table}
+                                                                <div class="table-list-item">
+                                                                    <div class="table-list-header">
+                                                                        <a href="/?namespace={namespace}&table={table.table_name}" class="table-link">
+                                                                            <strong>{table.table_name}</strong>
+                                                                        </a>
+                                                                        </div>
+                                                                    <p class="table-message">{table.message}</p>
+                                                                    <p class="table-timestamp">
+                                                                        Last seen: {new Date(table.timestamp).toLocaleString()}
+                                                                    </p>
+                                                                </div>
+                                                            {/each}
+                                                        </div>
+                                                    </div>
+                                                {/if}
+                                            </div>
+                                        {/each}
+                                    </div>
+                                </div>
+                            </AccordionItem>
+                        {/each}
+                    </Accordion>
+                {/if}
+            {:else if insightsSubTab === 1}
+                <div class="controls-container">
+                    <div class="control-item">
+                        <Toggle labelText="Show tables with no warnings" bind:toggled="{showEmptyResults}" />
+                    </div>
+                    <div class="control-item dropdown-control">
+                        <span class="bx--label">Select # of rows to show</span>
+                        <Dropdown
+                            id="rows-dropdown"
+                            bind:selectedId="{completedRunsLimit}"
+                            items="{limitOptions}"
+                        />
+                    </div>
+                </div>
+
+                {#if insights_loading}
+                    <DataTableSkeleton rowCount="{5}" columnCount="{5}" />
+                {:else if insightRuns.length === 0}
+                    <p>No completed health check jobs found across the lakehouse.</p>
+                {:else}
+                    <div class="insights-virtual-table-container-lakehouse">
+                        <VirtualTable
+                            data="{insightRuns}"
+                            columns="{completedRunsColumns}"
+                            bind:columnWidths="{completedRunsColWidths}"
+                            disableVirtualization="{true}"
+                            enableSearch="{true}"
+                        >
+                            <div slot="cell" let:row let:columnKey let:searchQuery>
+                                {#if columnKey === 'Job Type'}
+                                    <Tag type="{row.run_type === 'manual' ? 'cyan' : 'green'}" title="{row.run_type}"
+                                        >{row.run_type}</Tag
+                                    >
+                                {:else if columnKey === 'Timestamp'}
+                                    {@html highlightMatch(new Date(row.run_timestamp).toLocaleString(), searchQuery)}
+                                {:else if columnKey === 'Rules & Results'}
+                                    {@const codesWithResults = new Set(row.results.map((r) => r.code))}
+                                    <div class="rules-cell-container">
+                                        {#each row.rules_requested as ruleId}
+                                            {@const hasResults = codesWithResults.has(ruleId)}
+                                            {@const compositeKey = `${row.id}-${ruleId}`}
+                                            {@const ruleResults = row.results.filter((r) => r.code === ruleId)}
+                                            <!-- svelte-ignore a11y-click-events-have-key-events -->
+                                            <div
+                                                class="rule-item"
+                                                role="button"
+                                                tabindex="0"
+                                                on:click="{() => {
+                                                    if (hasResults) {
+                                                        expandedRules[compositeKey] = !expandedRules[compositeKey];
+                                                    }
+                                                }}"
+                                            >
+                                                <div class="rule-item-header">
+                                                    {#if hasResults}
+                                                        <WarningAltFilled size="{16}" style="color: var(--cds-support-03, #ff832b);" />
+                                                    {:else}
+                                                        <CheckmarkFilled size="{16}" style="color: var(--cds-support-02, #24a148);" />
+                                                    {/if}
+                                                    <span>{@html highlightMatch(ruleIdToNameMap.get(ruleId) || ruleId, searchQuery)}</span>
+                                                </div>
+                                                {#if expandedRules[compositeKey]}
+                                                    <div class="rule-details">
+                                                        {#each ruleResults as result}
+                                                            <div class="message-card">
+                                                                <p><strong>Message:</strong> {@html highlightMatch(result.message, searchQuery)}</p>
                                                             </div>
                                                         {/each}
                                                     </div>
-                                                </div>
-                                            {/if}
-                                        </div>
-                                    {/each}
-                                </div>
+                                                {/if}
+                                            </div>
+                                        {/each}
+                                    </div>
+                                {:else}
+                                    {@html highlightMatch(row[columnKey.toLowerCase().replace(' ', '_')], searchQuery)}
+                                {/if}
                             </div>
-                        </AccordionItem>
-                    {/each}
-                </Accordion>
-            {/if}
-        {:else if insightsSubTab === 1}
-            <div class="controls-container">
-                <div class="control-item">
-                    <Toggle labelText="Show tables with no warnings" bind:toggled="{showEmptyResults}" />
-                </div>
-                <div class="control-item dropdown-control">
-                    <span class="bx--label">Select # of rows to show</span>
-                    <Dropdown
-                        id="rows-dropdown"
-                        bind:selectedId="{completedRunsLimit}"
-                        items="{limitOptions}"
-                    />
-                </div>
-            </div>
-
-            {#if insights_loading}
-                <DataTableSkeleton rowCount="{5}" columnCount="{5}" />
-            {:else if insightRuns.length === 0}
-                <p>No completed health check jobs found across the lakehouse.</p>
-            {:else}
-                <div class="insights-virtual-table-container-lakehouse">
+                        </VirtualTable>
+                    </div>
+                {/if}
+            {:else if insightsSubTab === 2}
+                {#if runningJobsLoading}
+                    <DataTableSkeleton rowCount="{3}" columnCount="{5}" />
+                {:else if runningJobs.length === 0}
+                    <p>No jobs are currently in progress.</p>
+                {:else}
                     <VirtualTable
-                        data="{insightRuns}"
-                        columns="{completedRunsColumns}"
-                        bind:columnWidths="{completedRunsColWidths}"
+                        data="{runningJobs}"
+                        columns="{runningJobsColumns}"
+                        bind:columnWidths="{runningJobsColWidths}"
                         disableVirtualization="{true}"
                         enableSearch="{true}"
                     >
                         <div slot="cell" let:row let:columnKey let:searchQuery>
-                            {#if columnKey === 'Job Type'}
-                                <Tag type="{row.run_type === 'manual' ? 'cyan' : 'green'}" title="{row.run_type}"
-                                    >{row.run_type}</Tag
-                                >
-                            {:else if columnKey === 'Timestamp'}
-                                {@html highlightMatch(new Date(row.run_timestamp).toLocaleString(), searchQuery)}
-                            {:else if columnKey === 'Rules & Results'}
-                                {@const codesWithResults = new Set(row.results.map((r) => r.code))}
-                                <div class="rules-cell-container">
-                                    {#each row.rules_requested as ruleId}
-                                        {@const hasResults = codesWithResults.has(ruleId)}
-                                        {@const compositeKey = `${row.id}-${ruleId}`}
-                                        {@const ruleResults = row.results.filter((r) => r.code === ruleId)}
-                                        <!-- svelte-ignore a11y-click-events-have-key-events -->
-                                        <div
-                                            class="rule-item"
-                                            role="button"
-                                            tabindex="0"
-                                            on:click="{() => {
-                                                if (hasResults) {
-                                                    expandedRules[compositeKey] = !expandedRules[compositeKey];
-                                                }
-                                            }}"
-                                        >
-                                            <div class="rule-item-header">
-                                                {#if hasResults}
-                                                    <WarningAltFilled size="{16}" style="color: var(--cds-support-03, #ff832b);" />
-                                                {:else}
-                                                    <CheckmarkFilled size="{16}" style="color: var(--cds-support-02, #24a148);" />
-                                                {/if}
-                                                <span>{@html highlightMatch(ruleIdToNameMap.get(ruleId) || ruleId, searchQuery)}</span>
-                                            </div>
-                                            {#if expandedRules[compositeKey]}
-                                                <div class="rule-details">
-                                                    {#each ruleResults as result}
-                                                        <div class="message-card">
-                                                            <p><strong>Message:</strong> {@html highlightMatch(result.message, searchQuery)}</p>
-                                                        </div>
-                                                    {/each}
-                                                </div>
-                                            {/if}
-                                        </div>
-                                    {/each}
-                                </div>
+                            {#if columnKey === 'Status'}
+                                <Tag type="blue">{row.status}</Tag>
+                            {:else if columnKey === 'Started At'}
+                                {@html highlightMatch(row.started_at ? new Date(row.started_at).toLocaleString() : 'N/A', searchQuery)}
+                            {:else if columnKey === 'Job ID'}
+                                {@html highlightMatch(row.run_id, searchQuery)}
+                            {:else if columnKey === 'Table Name'}
+                                {@html highlightMatch(row.table_name ? row.table_name: '-', searchQuery)}
                             {:else}
-                                {@html highlightMatch(row[columnKey.toLowerCase().replace(' ', '_')], searchQuery)}
+                                {@html highlightMatch(row[columnKey.toLowerCase().replace(/ /g, '_')], searchQuery)}
                             {/if}
                         </div>
                     </VirtualTable>
-                </div>
+                {/if}
+            {:else if insightsSubTab === 3}
+                {#if schedulesLoading}
+                    <DataTableSkeleton rowCount="{3}" columnCount="{6}" />
+                {:else if scheduledJobs.length === 0}
+                    <p>No health checks runs are scheduled.</p>
+                {:else}
+                    <VirtualTable
+                        data="{scheduledJobs}"
+                        columns="{scheduledJobsColumns}"
+                        bind:columnWidths="{scheduledJobsColWidths}"
+                        disableVirtualization="{true}"
+                        enableSearch="{true}"
+                    >
+                        <div slot="cell" let:row let:columnKey let:searchQuery>
+                            {#if columnKey === 'Rules'}
+                                {@html highlightMatch(row.rules_requested.map((id) => ruleIdToNameMap.get(id) || id).join(', '), searchQuery)}
+                            {:else if columnKey === 'Enabled'}
+                                <Tag type="{row.is_enabled ? 'green' : 'gray'}"
+                                    >{row.is_enabled ? 'Enabled' : 'Disabled'}</Tag
+                                >
+                            {:else if columnKey === 'Next Run'}
+                                {@html highlightMatch(new Date(row.next_run_timestamp).toLocaleString(), searchQuery)}
+                            {:else}
+                                {@html highlightMatch(row[columnKey.toLowerCase().replace(/ /g, '_')], searchQuery)}
+                            {/if}
+                        </div>
+                    </VirtualTable>
+                {/if}
             {/if}
-        {:else if insightsSubTab === 2}
-            {#if runningJobsLoading}
-                <DataTableSkeleton rowCount="{3}" columnCount="{5}" />
-            {:else if runningJobs.length === 0}
-                <p>No jobs are currently in progress.</p>
-            {:else}
-                <VirtualTable
-                    data="{runningJobs}"
-                    columns="{runningJobsColumns}"
-                    bind:columnWidths="{runningJobsColWidths}"
-                    disableVirtualization="{true}"
-                    enableSearch="{true}"
-                >
-                    <div slot="cell" let:row let:columnKey let:searchQuery>
-                        {#if columnKey === 'Status'}
-                            <Tag type="blue">{row.status}</Tag>
-                        {:else if columnKey === 'Started At'}
-                            {@html highlightMatch(row.started_at ? new Date(row.started_at).toLocaleString() : 'N/A', searchQuery)}
-                        {:else if columnKey === 'Job ID'}
-                            {@html highlightMatch(row.run_id, searchQuery)}
-                        {:else if columnKey === 'Table Name'}
-                            {@html highlightMatch(row.table_name ? row.table_name: '-', searchQuery)}
-                        {:else}
-                            {@html highlightMatch(row[columnKey.toLowerCase().replace(/ /g, '_')], searchQuery)}
-                        {/if}
-                    </div>
-                </VirtualTable>
-            {/if}
-        {:else if insightsSubTab === 3}
-            {#if schedulesLoading}
-                <DataTableSkeleton rowCount="{3}" columnCount="{6}" />
-            {:else if scheduledJobs.length === 0}
-                <p>No health checks runs are scheduled.</p>
-            {:else}
-                <VirtualTable
-                    data="{scheduledJobs}"
-                    columns="{scheduledJobsColumns}"
-                    bind:columnWidths="{scheduledJobsColWidths}"
-                    disableVirtualization="{true}"
-                    enableSearch="{true}"
-                >
-                    <div slot="cell" let:row let:columnKey let:searchQuery>
-                        {#if columnKey === 'Rules'}
-                            {@html highlightMatch(row.rules_requested.map((id) => ruleIdToNameMap.get(id) || id).join(', '), searchQuery)}
-                        {:else if columnKey === 'Enabled'}
-                            <Tag type="{row.is_enabled ? 'green' : 'gray'}"
-                                >{row.is_enabled ? 'Enabled' : 'Disabled'}</Tag
-                            >
-                        {:else if columnKey === 'Next Run'}
-                            {@html highlightMatch(new Date(row.next_run_timestamp).toLocaleString(), searchQuery)}
-                        {:else}
-                            {@html highlightMatch(row[columnKey.toLowerCase().replace(/ /g, '_')], searchQuery)}
-                        {/if}
-                    </div>
-                </VirtualTable>
-            {/if}
-        {/if}
-    </div>
-
-    <Modal
-        bind:open="{openRunModal}"
-        modalHeading="Run New Health Check"
-        primaryButtonText="Start Job"
-        secondaryButtonText="Cancel"
-        on:submit="{handleManualRunSubmit}"
-        on:close="{resetModalForms}"
-        on:click:button--secondary="{() => openRunModal = false}"
-    >
-        <p>This will run the selected health check on all applicable tables across the selected namespace.</p>
-        <FormGroup legendText="Namespace">
-            <ComboBox
-                items="{dropdownNamespaces}"
-                bind:selectedId="{runModalSelectedNsId}"
-            />
-        </FormGroup>
-        <hr class="modal-divider" />
-        <div class="bx--form-item">
-            <fieldset class="bx--fieldset">
-                <legend class="bx--label legend-with-icon">
-                    <span>Rules to Check</span>
-                    <button class="info-button" on:click="{() => showRulesInfoModal = true}" title="View rule descriptions">
-                        <Information size="{16}" />
-                    </button>
-                </legend>
-                <Checkbox labelText="Select All" checked="{manualRunSelectAll}" indeterminate="{manualRunIndeterminate}" on:change="{toggleSelectAllManual}" />
-                <hr class="modal-divider-light" />
-                <div class="rules-grid">
-                    {#each allRules as rule}
-                        <Checkbox labelText="{rule.name}" value="{rule.id}" bind:group="{manualRunData.rules_requested}" />
-                    {/each}
-                </div>
-            </fieldset>
         </div>
-    </Modal>
 
-    <Modal
-        bind:open="{openScheduleModal}"
-        modalHeading="Schedule New Health Check Job"
-        primaryButtonText="Create Schedule"
-        secondaryButtonText="Cancel"
-        on:submit="{handleScheduleSubmit}"
-        on:close="{resetModalForms}"
-        on:click:button--secondary="{() => openScheduleModal = false}"
-    >
-        <p>This will schedule the selected health check to run on all applicable tables across the selected namespace.</p>
-        <FormGroup legendText="Namespace">
-            <ComboBox
-                items="{dropdownNamespaces}"
-                bind:selectedId="{scheduleModalSelectedNsId}"
-            />
-        </FormGroup>
-        <hr class="modal-divider" />
-        <div class="bx--form-item">
-            <fieldset class="bx--fieldset">
-                <legend class="bx--label legend-with-icon">
-                    <span>Rules to Check</span>
-                    <button class="info-button" on:click="{() => showRulesInfoModal = true}" title="View rule descriptions">
-                        <Information size="{16}" />
-                    </button>
-                </legend>
-                <Checkbox labelText="Select All" checked="{scheduleRunSelectAll}" indeterminate="{scheduleRunIndeterminate}" on:change="{toggleSelectAllSchedule}" />
-                <hr class="modal-divider-light" />
-                <div class="rules-grid">
-                    {#each allRules as rule}
-                        <Checkbox labelText="{rule.name}" value="{rule.id}" bind:group="{scheduleRunData.rules_requested}" />
-                    {/each}
-                </div>
-            </fieldset>
-        </div>
-        <hr class="modal-divider" />
-        <FormGroup legendText="Frequency">
-            <Select bind:selected="{scheduleRunData.frequency}">
-                <SelectItem value="weekly" text="Weekly" />
-                <SelectItem value="monthly" text="Monthly (1st)" />
-            </Select>
-        </FormGroup>
-        <FormGroup legendText="Cron Schedule (optional)">
-            <TextInput bind:value="{scheduleRunData.cron_schedule}" helperText="Overrides frequency selection" />
-        </FormGroup>
-    </Modal>
+        <Modal
+            bind:open="{openRunModal}"
+            modalHeading="Run New Health Check"
+            primaryButtonText="Start Job"
+            secondaryButtonText="Cancel"
+            on:submit="{handleManualRunSubmit}"
+            on:close="{resetModalForms}"
+            on:click:button--secondary="{() => openRunModal = false}"
+        >
+            <p>This will run the selected health check on all applicable tables across the selected namespace.</p>
+            <FormGroup legendText="Namespace">
+                <ComboBox
+                    items="{dropdownNamespaces}"
+                    bind:selectedId="{runModalSelectedNsId}"
+                />
+            </FormGroup>
+            <hr class="modal-divider" />
+            <div class="bx--form-item">
+                <fieldset class="bx--fieldset">
+                    <legend class="bx--label legend-with-icon">
+                        <span>Rules to Check</span>
+                        <button class="info-button" on:click="{() => showRulesInfoModal = true}" title="View rule descriptions">
+                            <Information size="{16}" />
+                        </button>
+                    </legend>
+                    <Checkbox labelText="Select All" checked="{manualRunSelectAll}" indeterminate="{manualRunIndeterminate}" on:change="{toggleSelectAllManual}" />
+                    <hr class="modal-divider-light" />
+                    <div class="rules-grid">
+                        {#each allRules as rule}
+                            <Checkbox labelText="{rule.name}" value="{rule.id}" bind:group="{manualRunData.rules_requested}" />
+                        {/each}
+                    </div>
+                </fieldset>
+            </div>
+        </Modal>
 
-    <Modal
-        passiveModal
-        bind:open="{showRulesInfoModal}"
-        modalHeading="Available Health Check Rules"
-        size="lg"
-    >
-        <table class="rules-table">
-            <thead>
-                <tr>
-                    <th>Rule Name</th>
-                    <th>Description</th>
-                </tr>
-            </thead>
-            <tbody>
-                {#each allRules as rule (rule.id)}
+        <Modal
+            bind:open="{openScheduleModal}"
+            modalHeading="Schedule New Health Check Job"
+            primaryButtonText="Create Schedule"
+            secondaryButtonText="Cancel"
+            on:submit="{handleScheduleSubmit}"
+            on:close="{resetModalForms}"
+            on:click:button--secondary="{() => openScheduleModal = false}"
+        >
+            <p>This will schedule the selected health check to run on all applicable tables across the selected namespace.</p>
+            <FormGroup legendText="Namespace">
+                <ComboBox
+                    items="{dropdownNamespaces}"
+                    bind:selectedId="{scheduleModalSelectedNsId}"
+                />
+            </FormGroup>
+            <hr class="modal-divider" />
+            <div class="bx--form-item">
+                <fieldset class="bx--fieldset">
+                    <legend class="bx--label legend-with-icon">
+                        <span>Rules to Check</span>
+                        <button class="info-button" on:click="{() => showRulesInfoModal = true}" title="View rule descriptions">
+                            <Information size="{16}" />
+                        </button>
+                    </legend>
+                    <Checkbox labelText="Select All" checked="{scheduleRunSelectAll}" indeterminate="{scheduleRunIndeterminate}" on:change="{toggleSelectAllSchedule}" />
+                    <hr class="modal-divider-light" />
+                    <div class="rules-grid">
+                        {#each allRules as rule}
+                            <Checkbox labelText="{rule.name}" value="{rule.id}" bind:group="{scheduleRunData.rules_requested}" />
+                        {/each}
+                    </div>
+                </fieldset>
+            </div>
+            <hr class="modal-divider" />
+            <FormGroup legendText="Frequency">
+                <Select bind:selected="{scheduleRunData.frequency}">
+                    <SelectItem value="weekly" text="Weekly" />
+                    <SelectItem value="monthly" text="Monthly (1st)" />
+                </Select>
+            </FormGroup>
+            <FormGroup legendText="Cron Schedule (optional)">
+                <TextInput bind:value="{scheduleRunData.cron_schedule}" helperText="Overrides frequency selection" />
+            </FormGroup>
+        </Modal>
+
+        <Modal
+            passiveModal
+            bind:open="{showRulesInfoModal}"
+            modalHeading="Available Health Check Rules"
+            size="lg"
+        >
+            <table class="rules-table">
+                <thead>
                     <tr>
-                        <td>{rule.name}</td>
-                        <td>{rule.description}</td>
+                        <th>Rule Name</th>
+                        <th>Description</th>
                     </tr>
-                {/each}
-            </tbody>
-        </table>
-    </Modal>
+                </thead>
+                <tbody>
+                    {#each allRules as rule (rule.id)}
+                        <tr>
+                            <td>{rule.name}</td>
+                            <td>{rule.description}</td>
+                        </tr>
+                    {/each}
+                </tbody>
+            </table>
+        </Modal>
 
-</Content>
-
+    </Content>
+{:else}
+    <Content>
+        <br />
+        <h3>Lakehouse Health</h3>
+        <p>
+            {HEALTH_DISABLED_MESSAGE}
+        </p>
+    </Content>
+{/if}
 <style>
     .header-container {
         margin-bottom: 1rem;

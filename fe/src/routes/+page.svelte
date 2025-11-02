@@ -14,7 +14,7 @@
 	import { selectedNamespce, selectedTable, sample_limit } from '$lib/stores';
 	import { page } from '$app/stores';
 	import { Renew, FilterRemove, Information } from 'carbon-icons-svelte';
-
+	import { healthEnabled, HEALTH_DISABLED_MESSAGE } from '$lib/stores';
 	let namespace;
 	let table;
 	$: tableKey = namespace && table ? `${namespace}.${table}` : '';
@@ -913,7 +913,7 @@
 	}
 
 	$: {
-		if (selected === 5 && table) {
+		if (selected === 5 && table && $healthEnabled) {
 			if (!insightsLoaded) {
 				fetchRunningJobs();
 				fetchTableInsights();
@@ -924,7 +924,7 @@
 		}
 	}
 
-	$: if (insightsSubTab === 2 && !schedulesLoaded) {
+	$: if (insightsSubTab === 2 && !schedulesLoaded && $healthEnabled) {
 		fetchSchedules();
 	}
 
@@ -1297,193 +1297,200 @@
 			</TabContent>
 
 			<TabContent>
-				<br />
-				<ButtonSet>
-					<Button icon="{Run}" on:click="{() => {
-							manualRunData.rules_requested = allRules.map(rule => rule.id);
-							openRunModal = true;
-						}
-					}">Run Health Check</Button>
-					<Button icon="{Calendar}" kind="secondary" on:click="{() => {
-						scheduleRunData.rules_requested = allRules.map(rule => rule.id);
-						openScheduleModal = true;
-					}}">
-						Schedule Health Check
-					</Button>
-					<Button
-						kind="ghost"
-						hasIconOnly
-						class="cds--btn--icon-only"
-						icon="{Renew}"
-						iconDescription="Refresh Data"
-						tooltipPosition="right"
-						on:click="{() => {
-							fetchRunningJobs();
-							fetchTableInsights();
-							fetchSchedules();
-						}}"
-					/>
-				</ButtonSet>
-				<div style="margin-top: 1.5rem;">
-					<Tabs bind:selected="{insightsSubTab}">
-						<Tab label="Completed Jobs" />
-						<Tab label="In-Progress Jobs" />
-						<Tab label="Scheduled Jobs" />
-					</Tabs>
-					<div class="tab-content-container">
-						{#if insightsSubTab === 0}
-							{#if insights_loading}
-								<DataTableSkeleton rowCount="{5}" columnCount="{3}" />
-							{:else if insightRuns.length === 0}
-								<p>No health checks for this table.</p>
-							{:else}
-								<div class="insights-virtual-table-container">
+				{#if $healthEnabled}
+					<br />
+					<ButtonSet>
+						<Button icon="{Run}" on:click="{() => {
+								manualRunData.rules_requested = allRules.map(rule => rule.id);
+								openRunModal = true;
+							}
+						}">Run Health Check</Button>
+						<Button icon="{Calendar}" kind="secondary" on:click="{() => {
+							scheduleRunData.rules_requested = allRules.map(rule => rule.id);
+							openScheduleModal = true;
+						}}">
+							Schedule Health Check
+						</Button>
+						<Button
+							kind="ghost"
+							hasIconOnly
+							class="cds--btn--icon-only"
+							icon="{Renew}"
+							iconDescription="Refresh Data"
+							tooltipPosition="right"
+							on:click="{() => {
+								fetchRunningJobs();
+								fetchTableInsights();
+								fetchSchedules();
+							}}"
+						/>
+					</ButtonSet>
+					<div style="margin-top: 1.5rem;">
+						<Tabs bind:selected="{insightsSubTab}">
+							<Tab label="Completed Jobs" />
+							<Tab label="In-Progress Jobs" />
+							<Tab label="Scheduled Jobs" />
+						</Tabs>
+						<div class="tab-content-container">
+							{#if insightsSubTab === 0}
+								{#if insights_loading}
+									<DataTableSkeleton rowCount="{5}" columnCount="{3}" />
+								{:else if insightRuns.length === 0}
+									<p>No health checks for this table.</p>
+								{:else}
+									<div class="insights-virtual-table-container">
+										<VirtualTable
+											data="{insightRuns}"
+											columns="{virtualTableColumns}"
+											disableVirtualization="{true}"
+											bind:columnWidths
+										>
+											<div slot="cell" let:row let:columnKey>
+												{#if columnKey === 'Job Type'}
+													<Tag
+														type="{row.run_type === 'manual' ? 'cyan' : 'green'}"
+														title="{row.run_type}">{row.run_type}</Tag
+													>
+												{:else if columnKey === 'Timestamp'}
+													{new Date(row.run_timestamp).toLocaleString()}
+												{:else if columnKey === 'Rules & Results'}
+													{@const codesWithResults = new Set(row.results.map((r) => r.code))}
+													{@const sortedRules = row.rules_requested.slice().sort((a, b) => {
+														const aHasResults = codesWithResults.has(a);
+														const bHasResults = codesWithResults.has(b);
+														return bHasResults - aHasResults;
+													})}
+													<div class="rules-cell-container">
+														{#each sortedRules as ruleId}
+															{@const hasResults = codesWithResults.has(ruleId)}
+															{@const compositeKey = `${row.id}-${ruleId}`}
+															{@const ruleResults = row.results.filter((r) => r.code === ruleId)}
+															<div
+																class="rule-item"
+																role="button"
+																tabindex="0"
+																on:click="{() => {
+																	if (hasResults) {
+																		expandedRules[compositeKey] = !expandedRules[compositeKey];
+																	}
+																}}"
+															>
+																<div class="rule-item-header">
+																	{#if hasResults}
+																		<WarningAltFilled
+																			size="{16}"
+																			style="color: var(--cds-support-03, #ff832b);"
+																		/>
+																	{:else}
+																		<CheckmarkFilled
+																			size="{16}"
+																			style="color: var(--cds-support-02, #24a148);"
+																		/>
+																	{/if}
+																	<span>{ruleIdToNameMap.get(ruleId) || ruleId}</span>
+																</div>
+
+																{#if expandedRules[compositeKey]}
+																	<div class="rule-details">
+																		{#each ruleResults as result}
+																			<div class="message-card">
+																				<p><strong>Message:</strong> {result.message}</p>
+																				<p>
+																					<strong>Suggested Action:</strong>
+																					{result.suggested_action}
+																				</p>
+																			</div>
+																		{/each}
+																	</div>
+																{/if}
+															</div>
+														{/each}
+													</div>
+												{/if}
+											</div>
+										</VirtualTable>
+									</div>
+								{/if}
+							{:else if insightsSubTab === 1}
+								<div class="running-jobs-section">
+									{#if runningJobsLoading}
+										<DataTableSkeleton rowCount="{2}" columnCount="{4}" />
+									{:else if runningJobs.length > 0}
+										<VirtualTable
+											data="{runningJobs}"
+											columns="{runningJobsColumns}"
+											disableVirtualization="{true}"
+											bind:columnWidths="{runningJobsColumnWidths}"
+										>
+											<div slot="cell" let:row let:columnKey>
+												{#if columnKey === 'Status'}
+													<Tag type="blue">{row.Status}</Tag>
+												{:else if columnKey === 'Started At'}
+													{row['Started At'] ? new Date(row['Started At']).toLocaleString() : 'N/A'}
+												{:else}
+													{row[columnKey]}
+												{/if}
+											</div>
+										</VirtualTable>
+									{:else}
+										<p>There are no running jobs for this table.</p>
+									{/if}
+								</div>
+							{:else if insightsSubTab === 2}
+								{#if schedulesLoading}
+									<DataTableSkeleton rowCount="{3}" columnCount="{5}" />
+								{:else if scheduledJobs.length === 0}
+									<p>There are no scheduled jobs for this table.</p>
+								{:else}
 									<VirtualTable
-										data="{insightRuns}"
-										columns="{virtualTableColumns}"
+										data="{scheduledJobs}"
+										columns="{scheduledJobsColumns}"
 										disableVirtualization="{true}"
-										bind:columnWidths
+										bind:columnWidths="{scheduledJobsColumnWidths}"
 									>
 										<div slot="cell" let:row let:columnKey>
-											{#if columnKey === 'Job Type'}
-												<Tag
-													type="{row.run_type === 'manual' ? 'cyan' : 'green'}"
-													title="{row.run_type}">{row.run_type}</Tag
+											{#if columnKey === 'Rules'}
+												{row.rules_requested.map((id) => ruleIdToNameMap.get(id) || id).join(', ')}
+											{:else if columnKey === 'Schedule'}
+												{row.cron_schedule}
+											{:else if columnKey === 'Enabled'}
+												<Tag type="{row.is_enabled ? 'green' : 'gray'}"
+													>{row.is_enabled ? 'Enabled' : 'Disabled'}</Tag
 												>
-											{:else if columnKey === 'Timestamp'}
-												{new Date(row.run_timestamp).toLocaleString()}
-											{:else if columnKey === 'Rules & Results'}
-												{@const codesWithResults = new Set(row.results.map((r) => r.code))}
-												{@const sortedRules = row.rules_requested.slice().sort((a, b) => {
-													const aHasResults = codesWithResults.has(a);
-													const bHasResults = codesWithResults.has(b);
-													return bHasResults - aHasResults;
-												})}
-												<div class="rules-cell-container">
-													{#each sortedRules as ruleId}
-														{@const hasResults = codesWithResults.has(ruleId)}
-														{@const compositeKey = `${row.id}-${ruleId}`}
-														{@const ruleResults = row.results.filter((r) => r.code === ruleId)}
-														<div
-															class="rule-item"
-															role="button"
-															tabindex="0"
-															on:click="{() => {
-																if (hasResults) {
-																	expandedRules[compositeKey] = !expandedRules[compositeKey];
-																}
-															}}"
-														>
-															<div class="rule-item-header">
-																{#if hasResults}
-																	<WarningAltFilled
-																		size="{16}"
-																		style="color: var(--cds-support-03, #ff832b);"
-																	/>
-																{:else}
-																	<CheckmarkFilled
-																		size="{16}"
-																		style="color: var(--cds-support-02, #24a148);"
-																	/>
-																{/if}
-																<span>{ruleIdToNameMap.get(ruleId) || ruleId}</span>
-															</div>
-
-															{#if expandedRules[compositeKey]}
-																<div class="rule-details">
-																	{#each ruleResults as result}
-																		<div class="message-card">
-																			<p><strong>Message:</strong> {result.message}</p>
-																			<p>
-																				<strong>Suggested Action:</strong>
-																				{result.suggested_action}
-																			</p>
-																		</div>
-																	{/each}
-																</div>
-															{/if}
-														</div>
-													{/each}
+											{:else if columnKey === 'Next Run'}
+												{new Date(row.next_run_timestamp).toLocaleString()}
+											{:else if columnKey === 'Last Run'}
+												{row.last_run_timestamp
+													? new Date(row.last_run_timestamp).toLocaleString()
+													: 'N/A'}
+											{:else if columnKey === 'Actions'}
+												<div class="action-buttons">
+													<Button
+														kind="ghost"
+														icon="{Edit}"
+														iconDescription="Edit"
+														on:click="{() => openEditModal(row)}"
+													/>
+													<Button
+														kind="ghost"
+														icon="{TrashCan}"
+														iconDescription="Delete"
+														on:click="{() => openDeleteModal(row)}"
+													/>
 												</div>
 											{/if}
 										</div>
 									</VirtualTable>
-								</div>
-							{/if}
-						{:else if insightsSubTab === 1}
-							<div class="running-jobs-section">
-								{#if runningJobsLoading}
-									<DataTableSkeleton rowCount="{2}" columnCount="{4}" />
-								{:else if runningJobs.length > 0}
-									<VirtualTable
-										data="{runningJobs}"
-										columns="{runningJobsColumns}"
-										disableVirtualization="{true}"
-										bind:columnWidths="{runningJobsColumnWidths}"
-									>
-										<div slot="cell" let:row let:columnKey>
-											{#if columnKey === 'Status'}
-												<Tag type="blue">{row.Status}</Tag>
-											{:else if columnKey === 'Started At'}
-												{row['Started At'] ? new Date(row['Started At']).toLocaleString() : 'N/A'}
-											{:else}
-												{row[columnKey]}
-											{/if}
-										</div>
-									</VirtualTable>
-								{:else}
-									<p>There are no running jobs for this table.</p>
 								{/if}
-							</div>
-						{:else if insightsSubTab === 2}
-							{#if schedulesLoading}
-								<DataTableSkeleton rowCount="{3}" columnCount="{5}" />
-							{:else if scheduledJobs.length === 0}
-								<p>There are no scheduled jobs for this table.</p>
-							{:else}
-								<VirtualTable
-									data="{scheduledJobs}"
-									columns="{scheduledJobsColumns}"
-									disableVirtualization="{true}"
-									bind:columnWidths="{scheduledJobsColumnWidths}"
-								>
-									<div slot="cell" let:row let:columnKey>
-										{#if columnKey === 'Rules'}
-											{row.rules_requested.map((id) => ruleIdToNameMap.get(id) || id).join(', ')}
-										{:else if columnKey === 'Schedule'}
-											{row.cron_schedule}
-										{:else if columnKey === 'Enabled'}
-											<Tag type="{row.is_enabled ? 'green' : 'gray'}"
-												>{row.is_enabled ? 'Enabled' : 'Disabled'}</Tag
-											>
-										{:else if columnKey === 'Next Run'}
-											{new Date(row.next_run_timestamp).toLocaleString()}
-										{:else if columnKey === 'Last Run'}
-											{row.last_run_timestamp
-												? new Date(row.last_run_timestamp).toLocaleString()
-												: 'N/A'}
-										{:else if columnKey === 'Actions'}
-											<div class="action-buttons">
-												<Button
-													kind="ghost"
-													icon="{Edit}"
-													iconDescription="Edit"
-													on:click="{() => openEditModal(row)}"
-												/>
-												<Button
-													kind="ghost"
-													icon="{TrashCan}"
-													iconDescription="Delete"
-													on:click="{() => openDeleteModal(row)}"
-												/>
-											</div>
-										{/if}
-									</div>
-								</VirtualTable>
 							{/if}
-						{/if}
+						</div>
 					</div>
-				</div>
+				{:else}
+                    <br />
+                    <p>
+                        {HEALTH_DISABLED_MESSAGE}
+                    </p>
+                {/if}
 			</TabContent>
 		</svelte:fragment>
 	</Tabs>

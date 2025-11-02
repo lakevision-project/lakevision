@@ -11,6 +11,7 @@ from app.models import (
 from app.insights.utils import get_namespace_and_table_name, qualified_table_name
 from app.lakeviewer import LakeView
 from app.insights.runner import InsightsRunner
+from app.utils import get_bool_env
 from sqlalchemy import text
 from collections import defaultdict
 
@@ -294,6 +295,11 @@ def run_worker_cycle(
         return True # Indicates work was done
 if __name__ == "__main__":
     print(f"Starting worker process {WORKER_ID}")
+
+    # --- ADD THIS CHECK ---
+    if not get_bool_env('LAKEVISION_HEALTH_ENABLED'):
+        print("Health feature is disabled. Worker will not run.")
+        exit()  # Exit the script immediately
     
     # These storages are opened once and passed to the runner
     run_storage = get_storage(model=InsightRun)

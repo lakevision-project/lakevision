@@ -21,6 +21,7 @@
 	import { goto, afterNavigate } from '$app/navigation';
 	import { Logout, UserAvatarFilledAlt } from 'carbon-icons-svelte';
 	import Chat from '../lib/components/Chat.svelte';
+	import { healthEnabled } from '$lib/stores';
 
 	let user;
 	let isHeaderActionOpen = false;
@@ -76,6 +77,11 @@
 			}
 			CHAT_ENABLED = true;
 		}
+		if (env.LAKEVISION_HEALTH_ENABLED == 'true') {
+            healthEnabled.set(true);
+        } else {
+            healthEnabled.set(false);
+        }
 		if (env.PUBLIC_EXTRA_LINK) {
 			extra_link = env.PUBLIC_EXTRA_LINK;
 			extra_link_text = env.PUBLIC_EXTRA_LINK_TEXT;

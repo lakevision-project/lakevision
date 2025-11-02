@@ -5,6 +5,7 @@ from app.lakeviewer import LakeView
 from app.insights.runner import InsightsRunner
 from app.models import InsightRun, InsightRecord, JobSchedule, ActiveInsight, BackgroundJob, QueuedTask
 from app.storage import get_storage, StorageInterface
+from app.utils import get_bool_env
 from app.insights.utils import get_namespace_and_table_name
 import logging
 import uuid
@@ -85,6 +86,11 @@ if __name__ == "__main__":
     # This loop makes the script run forever.
     # In production, you'd use a real daemon or a cron job to run it.
     print("Starting scheduler process")
+
+    if not get_bool_env('LAKEVISION_HEALTH_ENABLED'):
+        print("Health feature is disabled. Scheduler will not run.")
+        exit()  # Exit the script immediately
+
     while True:
         try:
             print("Checking schedules to run")
