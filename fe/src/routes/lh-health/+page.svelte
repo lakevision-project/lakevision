@@ -413,6 +413,38 @@
         }
     }
 
+    function handleFrequencyChange() {
+		const freq = scheduleRunData.frequency;
+		switch (freq) {
+			case 'weekly':
+				scheduleRunData.cron_schedule = '0 0 * * 0';
+				break;
+			case 'biweekly':
+				scheduleRunData.cron_schedule = '0 0 1,15 * *';
+				break;
+			case 'monthly':
+				scheduleRunData.cron_schedule = '0 0 1 * *';
+				break;
+			case 'bimonthly':
+				scheduleRunData.cron_schedule = '0 0 1 */2 *';
+				break;
+		}
+	}
+
+    function displayScheduleFrequency(freq) {
+		switch (freq) {
+			case '0 0 * * 0':
+				return 'weekly';
+			case '0 0 1,15 * *':
+				return 'biweekly';
+			case '0 0 1 * *':
+				return 'monthly';
+			case '0 0 1 */2 *':
+				return 'bimonthly';
+		}
+        return 'custom';
+	}
+
     function resetModalForms() {
         manualRunData.rules_requested = [];
         manualRunData.namespace = '*';
@@ -421,6 +453,11 @@
         runModalSelectedNsId = '*';
         scheduleModalSelectedNsId = '*';
     }
+
+    function shouldFilterItem(item, value) {
+		if (!value) return true;
+		return item.text.toLowerCase().includes(value.toLowerCase());
+	}
 </script>
 {#if $healthEnabled}
     <Content>
@@ -685,6 +722,8 @@
                                 <Tag type="{row.is_enabled ? 'green' : 'gray'}"
                                     >{row.is_enabled ? 'Enabled' : 'Disabled'}</Tag
                                 >
+                            {:else if columnKey === 'Schedule'}
+								{displayScheduleFrequency(row.cron_schedule)}
                             {:else if columnKey === 'Next Run'}
                                 {@html highlightMatch(new Date(row.next_run_timestamp).toLocaleString(), searchQuery)}
                             {:else}
@@ -710,7 +749,13 @@
                 <ComboBox
                     items="{dropdownNamespaces}"
                     bind:selectedId="{runModalSelectedNsId}"
-                />
+                    {shouldFilterItem}
+			        let:item
+            >
+                    <div>
+                        <strong>{item.text}</strong>
+                    </div>
+            </ComboBox>
             </FormGroup>
             <hr class="modal-divider" />
             <div class="bx--form-item">
@@ -746,7 +791,13 @@
                 <ComboBox
                     items="{dropdownNamespaces}"
                     bind:selectedId="{scheduleModalSelectedNsId}"
-                />
+                    {shouldFilterItem}
+			        let:item
+            >
+                <div>
+                    <strong>{item.text}</strong>
+                </div>
+            </ComboBox>
             </FormGroup>
             <hr class="modal-divider" />
             <div class="bx--form-item">
@@ -768,13 +819,21 @@
             </div>
             <hr class="modal-divider" />
             <FormGroup legendText="Frequency">
-                <Select bind:selected="{scheduleRunData.frequency}">
+                <Select bind:selected="{scheduleRunData.frequency}" on:change="{handleFrequencyChange}">
                     <SelectItem value="weekly" text="Weekly" />
+                    <SelectItem value="biweekly" text="Biweekly (1st and 15th)" />
                     <SelectItem value="monthly" text="Monthly (1st)" />
+                    <SelectItem value="bimonthly" text="Bimonthly (1st of even months)" />
+                    <SelectItem value="custom" text="Custom" />
                 </Select>
             </FormGroup>
             <FormGroup legendText="Cron Schedule (optional)">
-                <TextInput bind:value="{scheduleRunData.cron_schedule}" helperText="Overrides frequency selection" />
+                <TextInput
+                    bind:value="{scheduleRunData.cron_schedule}"
+                    required
+                    readonly="{scheduleRunData.frequency !== 'custom'}"
+                    helperText="Format: minute hour day(month) month day(week)"
+                />
             </FormGroup>
         </Modal>
 

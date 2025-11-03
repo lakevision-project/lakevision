@@ -552,6 +552,20 @@
 		}
 	}
 
+    function displayScheduleFrequency(freq) {
+		switch (freq) {
+			case '0 0 * * 0':
+				return 'weekly';
+			case '0 0 1,15 * *':
+				return 'biweekly';
+			case '0 0 1 * *':
+				return 'monthly';
+			case '0 0 1 */2 *':
+				return 'bimonthly';
+		}
+        return 'custom';
+	}
+
 	async function fetchTableInsights() {
 		if (!namespace || !table) return;
 		insights_loading = true;
@@ -1452,7 +1466,7 @@
 											{#if columnKey === 'Rules'}
 												{row.rules_requested.map((id) => ruleIdToNameMap.get(id) || id).join(', ')}
 											{:else if columnKey === 'Schedule'}
-												{row.cron_schedule}
+												{displayScheduleFrequency(row.cron_schedule)}
 											{:else if columnKey === 'Enabled'}
 												<Tag type="{row.is_enabled ? 'green' : 'gray'}"
 													>{row.is_enabled ? 'Enabled' : 'Disabled'}</Tag
