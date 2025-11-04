@@ -867,7 +867,7 @@
         <br />
         <h3>Lakehouse Health</h3>
         <p>
-            {HEALTH_DISABLED_MESSAGE}
+            {@html HEALTH_DISABLED_MESSAGE}
         </p>
     </Content>
 {/if}

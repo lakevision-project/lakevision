@@ -1502,7 +1502,7 @@
 				{:else}
                     <br />
                     <p>
-                        {HEALTH_DISABLED_MESSAGE}
+                        {@html HEALTH_DISABLED_MESSAGE}
                     </p>
                 {/if}
 			</TabContent>

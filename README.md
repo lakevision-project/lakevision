@@ -51,7 +51,7 @@ https://github.com/user-attachments/assets/b6b2eef5-9f27-40ca-a80d-27b88d4a8cfd
 * Graphical summary of record additions over time
 * OIDC/OAuth-based authentication support
 * Pluggable authorization
-* Lakehouse Health Feature
+* [Lakehouse Health Feature](#lakehouse-health-feature)
 * Optional “Chat with Lakehouse” capability
 
 ## ⚙️ Environment Setup
