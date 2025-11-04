@@ -51,6 +51,7 @@ https://github.com/user-attachments/assets/b6b2eef5-9f27-40ca-a80d-27b88d4a8cfd
 * Graphical summary of record additions over time
 * OIDC/OAuth-based authentication support
 * Pluggable authorization
+* Lakehouse Health Feature
 * Optional “Chat with Lakehouse” capability
 
 ## ⚙️ Environment Setup
@@ -223,6 +224,51 @@ Sample manifests are provided in [`k8s/`](k8s/), including example `Deployment`,
 
 - See [`k8s/README.md`](k8s/README.md) for quickstart instructions and customization notes.
 - You’ll need to edit the image name and environment variables before deploying.
+
+## Lakehouse Health Feature
+
+The Lakehouse Health feature provides a system for running, scheduling, and monitoring data quality and health checks across your lakehouse.
+
+When enabled, it adds two main UI components:
+* A **"Health Check"** tab on the main table-details page.
+* A dedicated **"Lakehouse Health"** page for a high-level overview of all known issues.
+
+### Architecture
+
+This feature is **disabled by default** and operates as a small, services-oriented system. It relies on a central database and two independent background processes to function.
+
+1.  **Main API (`api.py`):** This is the main web server. It serves the frontend UI, handles user-triggered actions (e.g., "Run Health Check Now"), and reads from the database to display results.
+2.  **Scheduler (`scheduler.py`):** This is a lightweight, separate background process. Its only job is to run periodically (e.g., every 10 minutes), check for any scheduled jobs that are due, and enqueue them as tasks in the database.
+3.  **Worker (`worker.py`):** This is the heavy-lifting background process. It constantly polls the database task queue. When it finds a new task, it executes the actual health check against the Iceberg table, generates the results, and writes them back to the database. This would ideally run in another container, so that you can scale and have multiple workers active.
+
+This separation ensures that a long-running health check (e.g., on a huge table) does not block or slow down the main API server.
+
+### Configuration
+
+To enable this feature, you must set two environment variables.
+
+1.  **`PUBLIC_LAKEVISION_HEALTH_ENABLED`**
+    * `true`: Enables the feature in both the frontend and backend.
+    * `false` (or not set): Disables the feature entirely.
+        * The UI will show a "Feature is disabled" message.
+        * The backend API routes (`/api/insights`, `/api/jobs`) will not be loaded.
+        * The `scheduler.py` and `worker.py` scripts will exit immediately if you try to run them.
+
+2.  **`LAKEVISION_DATABASE_URL`**
+    * This is **only** required if `PUBLIC_LAKEVISION_HEALTH_ENABLED` is `true`.
+    * It must be a connection string to a persistent database (e.g., PostgreSQL, MySQL).
+    * This database is used to store all health results, schedules, and the task queue. All three processes (API, Scheduler, and Worker) must be able to connect to it.
+
+### Running the Feature
+
+When the health feature is enabled, you must run **three separate processes** for it to function correctly. Beside the main backend, you need to run 2 additional processes:
+
+```Procfile
+# 1. The scheduler process
+scheduler: python -m app.scheduler
+
+# 2. The worker process
+worker: python -m app.worker
 
 
 ## 🧭 Roadmap
