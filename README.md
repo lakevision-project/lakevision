@@ -93,6 +93,14 @@ The easiest way to run Lakevision is with Docker.
    docker run --env-file .env -p 8081:8081 lakevision:1.0 /app/start.sh
    ```
 
+4. **Run the health worker container**
+
+   If the health functionality is enabled you need to start the container for the health worker.
+
+   ```bash
+   docker run --env-file .env lakevision:1.0 /app/worker.sh
+   ```
+
 Once started, the backend listens on port 8000 and Nginx runs on port 8081. Visit [http://localhost:8081](http://localhost:8081) to explore the UI.
 
 > ✅ Tested on Linux and macOS with the Iceberg REST catalog. Other PyIceberg-compatible catalogs should work too.
