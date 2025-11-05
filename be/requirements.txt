@@ -15,3 +15,6 @@ humanize
 sqlglot
 sqlalchemy
 duckdb>=0.9.2
+croniter
+python-dateutil
+psycopg2-binary

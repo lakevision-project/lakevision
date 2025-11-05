@@ -17,6 +17,9 @@ help:
 	@echo "  make clean-be          - Remove backend virtualenv"
 	@echo "  make clean-catalog     - Remove sample catalog and warehouse files"
 	@echo ""
+	@echo ""
+	@echo "Scheduler:"
+	@echo "  make run-scheduler     - Run scheduler app"
 	@echo "Frontend:"
 	@echo "  make init-fe           - Install frontend dependencies"
 	@echo "  make run-fe            - Run frontend dev server"
@@ -71,6 +74,20 @@ clean-catalog:
 test-be:
 	$(CHECK_VENV)
 	cd be && PYTHONPATH=app ../$(VENV_PYTHON) -m pytest tests
+
+# --- Worker ---
+
+.PHONY: run-worker
+run-worker:
+	$(CHECK_VENV)
+	cd be && set -a && source ../.env && set +a && PYTHONPATH=app ../$(VENV_PYTHON) -m app.worker
+
+# --- Scheduler ---
+
+.PHONY: run-scheduler
+run-scheduler:
+	$(CHECK_VENV)
+	cd be && set -a && source ../.env && set +a && PYTHONPATH=app ../$(VENV_PYTHON) -m app.scheduler
 
 # --- Frontend ---
 
