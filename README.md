@@ -17,7 +17,7 @@
     <img src="https://img.shields.io/badge/Lakevision-Join_Slack-blue?logo=slack" alt="Join Slack">
   </a>
   <a href="https://deepwiki.com/lakevision-project/lakevision/">
-    <img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki">
+    <a href="https://deepwiki.com/lakevision-project/lakevision"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
   </a>
   <a href="https://lakevision-demo.1ygdbovivg6p.us-east.codeengine.appdomain.cloud/">
     <img src="https://img.shields.io/badge/Live%20Demo-Try%20Now-brightgreen?logo=googlechrome" alt="Live Demo">
