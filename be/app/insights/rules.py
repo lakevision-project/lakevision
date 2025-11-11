@@ -15,18 +15,34 @@ from app.models import Insight
 
 rules_yaml_path = os.path.join(os.path.dirname(__file__), "rules.yaml")
 
-SEVERAL_FILES = 100
-AVERAGE_SMALL_FILES_IN_BYTES = 100_000
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
 ONE_GB_IN_BYTES = 1000**3  # 1 GB in bytes (1024**3 is the actual value)
-LARGE_TABLE_IN_BYTES= 50 * ONE_GB_IN_BYTES
-AVERAGE_SMALL_FILES_LARGE_TABLES_IN_BYTES = 50_000
-MAX_SNAPSHOTS_RECOMMENDED = 500
-SKEWED_PARTITION_THRESHOLD_RATIO = 10 
+SEVERAL_FILES = _env_int("LV_RULE_SMALL_FILES_MIN_COUNT", 100)
+AVERAGE_SMALL_FILES_IN_BYTES = _env_int("LV_RULE_SMALL_FILES_AVG_BYTES", 100_000)
+LARGE_TABLE_IN_BYTES = _env_int("LV_RULE_LARGE_TABLE_BYTES", 50 * ONE_GB_IN_BYTES)
+AVERAGE_SMALL_FILES_LARGE_TABLES_IN_BYTES = _env_int("LV_RULE_SMALL_FILES_LARGE_TABLE_AVG_BYTES", 50_000)
+MAX_SNAPSHOTS_RECOMMENDED = _env_int("LV_RULE_MAX_SNAPSHOTS", 500)
+SKEWED_PARTITION_THRESHOLD_RATIO = _env_float("LV_RULE_SKEW_RATIO", 10)
 
 # Load yaml at app startup
 with open(rules_yaml_path) as f:
     INSIGHT_META = yaml.safe_load(f)
-    
+
+
 def rule_small_files(table: Table) -> Optional[Insight]:
     files = [file_scan_task.file.file_size_in_bytes for file_scan_task in table.scan().plan_files()]
     if not files:

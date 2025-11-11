@@ -1,11 +1,13 @@
 import logging
 import os
+from urllib.parse import urlparse
 
 import fsspec
 import pyarrow.parquet as pq
 from pyiceberg import catalog
-from pyiceberg.io import PY_IO_IMPL, FSSPEC_FILE_IO
-from urllib.parse import urlparse
+from pyiceberg.io import FSSPEC_FILE_IO, PY_IO_IMPL
+
+from create_test_iceberg_tables import seed_demo_health_tables
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -83,6 +85,11 @@ def main():
     for sample in sample_files:
         table_name = f'default.{sample["table"]}'
         create_table_if_missing(cat, table_name, sample["url"])
+    if os.getenv("LV_SKIP_HEALTH_DEMO", "false").lower() not in {"1", "true", "yes"}:
+        logger.info("🧪 Generating demo health tables...")
+        seed_demo_health_tables(cat)
+    else:
+        logger.info("⏭️  Skipping demo health tables (LV_SKIP_HEALTH_DEMO was set)")
 
 if __name__ == "__main__":
     main()
