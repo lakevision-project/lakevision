@@ -1,6 +1,9 @@
 import time
 import logging
 import importlib
+import importlib.util
+import sys
+from pathlib import Path
 from threading import Timer
 from fastapi import Request, HTTPException
 
@@ -11,12 +14,80 @@ from app.models import BackgroundJob, InsightRun, JobSchedule, InsightRecord, Ac
 from app import config
 from app.insights.runner import InsightsRunner
 
+logger = logging.getLogger(__name__)
+
+DEFAULT_AUTHZ_MODULE = "app.authz"
+DEFAULT_AUTHZ_CLASS = "Authz"
+
+
+def _load_default_authz_class():
+    """Load the built-in authz.py implementation directly from disk."""
+    authz_py = Path(__file__).resolve().parent / "authz.py"
+    if not authz_py.exists():
+        logger.error("Bundled authz.py not found at %s", authz_py)
+        return None
+
+    spec = importlib.util.spec_from_file_location("app._default_authz", authz_py)
+    if spec is None or spec.loader is None:
+        logger.error("Unable to create module spec for bundled authz.py")
+        return None
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["app._default_authz"] = module
+    spec.loader.exec_module(module)
+
+    fallback_class = getattr(module, DEFAULT_AUTHZ_CLASS, None)
+    if fallback_class is None:
+        logger.error(
+            "Bundled authz.py does not define class '%s'",
+            DEFAULT_AUTHZ_CLASS,
+        )
+        return None
+
+    logger.info("Loaded bundled authorization class from %s", authz_py)
+    return fallback_class
+
+
+def _load_authz_class():
+    """Dynamically load an authorization class, preferring configured plugins."""
+    try:
+        authz_module = importlib.import_module(config.AUTHZ_MODULE)
+        authz_class = getattr(authz_module, config.AUTHZ_CLASS)
+        logger.info(
+            "Loaded authorization plugin %s.%s",
+            config.AUTHZ_MODULE,
+            config.AUTHZ_CLASS,
+        )
+        return authz_class
+    except Exception as exc:
+        using_defaults = (
+            config.AUTHZ_MODULE == DEFAULT_AUTHZ_MODULE
+            and config.AUTHZ_CLASS == DEFAULT_AUTHZ_CLASS
+        )
+        if using_defaults:
+            logger.warning(
+                "Default authorization import (%s.%s) failed; "
+                "falling back to bundled authz.py. Error: %s",
+                config.AUTHZ_MODULE,
+                config.AUTHZ_CLASS,
+                exc,
+            )
+            fallback_class = _load_default_authz_class()
+            if fallback_class:
+                return fallback_class
+        logger.exception(
+            "Unable to initialize authorization plugin '%s.%s'",
+            config.AUTHZ_MODULE,
+            config.AUTHZ_CLASS,
+        )
+        raise
+
+
 # --- Service Instances ---
 lv = LakeView()
 
 # --- Authorization ---
-authz_module = importlib.import_module(config.AUTHZ_MODULE)
-authz_class = getattr(authz_module, config.AUTHZ_CLASS)
+authz_class = _load_authz_class()
 authz_ = authz_class()
 
 # --- Storage Instances ---
