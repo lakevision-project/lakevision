@@ -29,8 +29,9 @@ COPY nginx.conf /etc/nginx/
 
 ARG ENABLE_SAMPLE_CATALOG=false
 
-# Copy sample loader into the container
+# Copy sample loader and helpers into the container
 COPY scripts/load_sample_data.py /app/scripts/load_sample_data.py
+COPY scripts/create_test_iceberg_tables.py /app/scripts/create_test_iceberg_tables.py
 
 RUN if [ "$ENABLE_SAMPLE_CATALOG" = "true" ]; then \
       echo "🧪 Loading sample catalog for quickstart..." && \
@@ -43,6 +44,6 @@ RUN if [ "$ENABLE_SAMPLE_CATALOG" = "true" ]; then \
     fi
 
 #fix later, this is for OCP
-RUN chmod -R 777 /app/fe/ && chmod -R 777 /var/lib/nginx/
+RUN chmod -R 777 /app/ && chmod -R 777 /var/lib/nginx/
 EXPOSE 3000 8000 8081
 ENV HOST=0.0.0.0
