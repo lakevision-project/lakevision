@@ -207,7 +207,7 @@
 	size='lg'
 	passiveModal
 	bind:open={isChatOpen}
-	modalHeading="{CHAT_NAME} - Chat with your Lakehouse"
+	modalHeading="{CHAT_NAME}"
 	on:open={handleChatOpen}
 	on:close={handleChatClose}
 	on:click:overlay={handleChatClose}
