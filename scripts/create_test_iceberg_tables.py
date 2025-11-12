@@ -92,12 +92,14 @@ class DemoTableBuilder:
             logger.info("🗑️  Dropping existing demo table %s", ident)
             self.catalog.drop_table(ident)
         logger.info("🆕 Creating demo table %s", ident)
-        return self.catalog.create_table(
-            identifier=ident,
-            schema=schema,
-            partition_spec=partition_spec,
-            properties=properties or {},
-        )
+        create_kwargs = {
+            "identifier": ident,
+            "schema": schema,
+            "properties": properties or {},
+        }
+        if partition_spec is not None:
+            create_kwargs["partition_spec"] = partition_spec
+        return self.catalog.create_table(**create_kwargs)
 
     # ------------------------------------------------------------------ helpers
 
