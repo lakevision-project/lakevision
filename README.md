@@ -255,7 +255,7 @@ This separation ensures that a long-running health check (e.g., on a huge table)
 
 To enable this feature, you must set two environment variables.
 
-1.  **`PUBLIC_LAKEVISION_HEALTH_ENABLED`**
+1.  **`PUBLIC_HEALTH_ENABLED`**
     * `true`: Enables the feature in both the frontend and backend.
     * `false` (or not set): Disables the feature entirely.
         * The UI will show a "Feature is disabled" message.
@@ -263,7 +263,7 @@ To enable this feature, you must set two environment variables.
         * The `scheduler.py` and `worker.py` scripts will exit immediately if you try to run them.
 
 2.  **`LAKEVISION_DATABASE_URL`**
-    * This is **only** required if `PUBLIC_LAKEVISION_HEALTH_ENABLED` is `true`.
+    * This is **only** required if `PUBLIC_HEALTH_ENABLED` is `true`.
     * It must be a connection string to a persistent database (e.g., PostgreSQL, MySQL).
     * This database is used to store all health results, schedules, and the task queue. All three processes (API, Scheduler, and Worker) must be able to connect to it.
 
