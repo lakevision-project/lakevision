@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lakevision-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lakevision-worker
+  template:
+    metadata:
+      labels:
+        app: lakevision-worker
+    spec:
+      imagePullSecrets:
+        - name: quay-cred
+      containers:
+        - name: lakevision-worker
+          image: registry-host/namespace/lakevision:tag
+          command: ["/bin/bash", "-c", "/app/worker.sh"]
+          envFrom:
+            - configMapRef:
+                name: lakevision-config
+            - secretRef:
+                name: lakevision-secrets
