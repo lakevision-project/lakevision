@@ -6,6 +6,7 @@ import json, os, time, re
 import pandas as pd
 import pyarrow as pa
 import daft
+from daft.context import get_context
 import humanize
 import pyarrow.compute as pc
 import numpy as np
@@ -117,7 +118,7 @@ class LakeView():
                 and "total-data-files" in curr_snapshot.summary.keys()
                 and int(curr_snapshot.summary["total-data-files"]) > 200
             ):
-                optimized_plan = df._builder.optimize()._builder.repr_ascii(
+                optimized_plan = df._builder.optimize(get_context().daft_execution_config)._builder.repr_ascii(
                     simple=False
                 )
                 logging.info(optimized_plan)
