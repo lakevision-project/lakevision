@@ -167,15 +167,15 @@
     };
 
     // --- Data Fetching ---
-    onMount(() => {
-        if ($healthEnabled) {
+    $: {
+        if (browser && $healthEnabled && allRules.length === 0) {
             fetchOverviewData();
             fetchRunningJobs();
             fetchSchedules();
-            if (allRules.length === 0) fetchAllRules();
-            if (allNamespaces.length === 0) fetchAllNamespaces();
+            fetchAllRules();
+            fetchAllNamespaces();
         }
-    });
+    }
 
     $: {
         completedRunsLimit;

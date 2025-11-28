@@ -39,6 +39,10 @@ CHECK_VENV = \
 	  exit 1; \
 	fi
 
+.PHONY: check-venv
+check-venv:
+	$(CHECK_VENV)
+
 .PHONY: init-be
 init-be:
 	cd be && python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt -r requirements-dev.txt
@@ -48,6 +52,14 @@ init-be:
 run-be:
 	$(CHECK_VENV)
 	cd be && set -a && source ../.env && set +a && PYTHONPATH=app ../$(VENV_PYTHON) -m uvicorn app.api:app --reload --port 8000
+
+.PHONY: be-cmd
+be-cmd: check-venv
+	@if [ -z "$(CMD)" ]; then \
+	  echo "CMD must be provided, e.g. make be-cmd CMD='PYTHONPATH=app ../$(VENV_PYTHON) -m ...'"; \
+	  exit 2; \
+	fi
+	cd be && set -a && source ../.env && set +a && $(CMD)
 
 .PHONY: clean-be
 clean-be:
