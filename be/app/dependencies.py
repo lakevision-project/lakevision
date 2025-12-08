@@ -156,7 +156,7 @@ def refresh_namespace_and_tables():
 
 # --- Authentication Dependency ---
 def check_auth(request: Request):
-    return request.session.get("user")
+    return request.cookies.get("access_token")
 
 # --- Table Loading Dependency ---
 def load_table(table_id: str) -> Table:
