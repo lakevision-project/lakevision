@@ -28,8 +28,8 @@
 	let AUTH_ENABLED = false;
 	let CHAT_ENABLED = false;
 	let CHAT_NAME = 'Chat';
-	let extra_link;
-	let extra_link_text;
+	let extra_links = [];
+	let extra_header_links = [];
 	let company = 'Apache Iceberg';
 	let platform = 'Lakevision';
 
@@ -83,10 +83,20 @@
         } else {
             healthEnabled.set(false);
         }
-		if (env.PUBLIC_EXTRA_LINK) {
-			extra_link = env.PUBLIC_EXTRA_LINK;
-			extra_link_text = env.PUBLIC_EXTRA_LINK_TEXT;
-		}
+		if (env.PUBLIC_EXTRA_LINKS) {
+            try {
+                extra_links = JSON.parse(env.PUBLIC_EXTRA_LINKS);
+            } catch (e) {
+                console.error("Failed to parse PUBLIC_EXTRA_LINKS. Ensure it is valid JSON.", e);
+            }
+        }
+		if (env.PUBLIC_EXTRA_HEADER_LINKS) {
+            try {
+                extra_header_links = JSON.parse(env.PUBLIC_EXTRA_HEADER_LINKS);
+            } catch (e) {
+                console.error("Failed to parse PUBLIC_EXTRA_HEADER_LINKS. Ensure it is valid JSON.", e);
+            }
+        }
 		if (env.PUBLIC_COMPANY_NAME) company = env.PUBLIC_COMPANY_NAME;
 		if (env.PUBLIC_PLATFORM_NAME) platform = env.PUBLIC_PLATFORM_NAME;
 		if (AUTH_ENABLED && user == null) {
@@ -166,7 +176,15 @@
 	{#if CHAT_ENABLED}
 		<HeaderNavItem text="{CHAT_NAME}" href="?openChat=true" />
 	{/if}
-
+	{#if extra_header_links.length > 0}
+        {#each extra_header_links as link}
+            <HeaderNavItem 
+                text="{link.text}" 
+                href="{link.href}" 
+                target="{link.target || '_blank'}" 
+            />
+        {/each}
+    {/if}
 
 	<HeaderUtilities>
 		<HeaderActionLink href="https://github.com/IBM/lakevision" target="_blank">
@@ -180,17 +198,19 @@
 				on:click="{(event) => handleLogout(event)}"
 			/>
 		{/if}
-		{#if extra_link}
-			<HeaderAction bind:isOpen="{isHeaderActionOpen}">
-				<HeaderPanelLinks>
-					<HeaderPanelLink
-						text="{extra_link_text}"
-						href="{extra_link}"
-						target="_blank"
-					></HeaderPanelLink>
-				</HeaderPanelLinks>
-			</HeaderAction>
-		{/if}
+		{#if extra_links.length > 0}
+            <HeaderAction bind:isOpen="{isHeaderActionOpen}">
+                <HeaderPanelLinks>
+                    {#each extra_links as link}
+                        <HeaderPanelLink
+                            text="{link.text}"
+                            href="{link.href}"
+                            target="_blank"
+                        ></HeaderPanelLink>
+                    {/each}
+                </HeaderPanelLinks>
+            </HeaderAction>
+        {/if}
 	</HeaderUtilities>
 </Header>
 
