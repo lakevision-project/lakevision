@@ -49,7 +49,6 @@ def get_token(request: Request, token_req: TokenRequest):
     response = requests.post(config.TOKEN_URL, data=data)
     
     if response.status_code != 200:
-        print(response.json())
         raise HTTPException(status_code=400, detail="Failed to exchange code for token")
     
     token_data = response.json()
