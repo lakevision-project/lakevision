@@ -22,15 +22,12 @@
     import { Logout, UserAvatarFilledAlt } from 'carbon-icons-svelte';
     import Chat from '../lib/components/Chat.svelte';
     
-    // --- CORRECTED IMPORTS: Import user store and other stores ---
     import { healthEnabled, user } from '$lib/stores'; 
 
-    // --- FIX 1: Migrate local 'user' to store-subscribed 'currentUser' ---
     let currentUser;
     user.subscribe(value => {
         currentUser = value;
     });
-    // --- END FIX 1 ---
     
     let isHeaderActionOpen = false;
     let AUTH_ENABLED = false;
@@ -81,8 +78,6 @@
     const handleChatClose = () => setChatOpen(false);
     const handleChatOpen  = () => setChatOpen(true);
 
-
-    // --- NEW: Session Check Function ---
     async function checkExistingSession() {
         console.log("Checking for existing session...");
         try {
@@ -103,8 +98,6 @@
             return false;
         }
     }
-    // --- END NEW SESSION CHECK ---
-
 
     onMount(async () => {
         if (env.PUBLIC_AUTH_ENABLED == 'true') {
@@ -129,30 +122,24 @@
         if (env.PUBLIC_COMPANY_NAME) company = env.PUBLIC_COMPANY_NAME;
         if (env.PUBLIC_PLATFORM_NAME) platform = env.PUBLIC_PLATFORM_NAME;
         
-        // --- UPDATED AUTH FLOW ---
         if (AUTH_ENABLED) {
             const params = new URLSearchParams(window.location.search);
             const code = params.get('code');
             const state = params.get('state');
 
             if (code) {
-                // 1. Redirect from IdP: Exchange code
                 exchangeCodeForToken(code, state);
             } else if (currentUser === null) {
-                // 2. Refresh scenario: Check for existing session
                 const sessionFound = await checkExistingSession();
                 if (!sessionFound) {
-                    // 3. If no session and no code, force login
                     console.error('No authorization code found! Redirecting to login.');
                     login();
                 }
             }
         }
-        // --- END UPDATED AUTH FLOW ---
     });
 
     async function exchangeCodeForToken(code, state) {
-        // --- UPDATED: Use configurable endpoint ---
         const response = await fetch(AUTH_TOKEN_EXCHANGE_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -192,7 +179,6 @@
     }
 
     async function logout() {
-        // --- UPDATED: Use POST fetch to tell backend to destroy HttpOnly ---
         await fetch('/api/logout', { method: 'POST' });
         user.set(null); // Clear store
         // Force reload to trigger session check, which will now fail and redirect to login.
@@ -222,7 +208,7 @@
         </HeaderActionLink>
         {#if AUTH_ENABLED}
             <!-- Display user details from the store object -->
-            <HeaderGlobalAction iconDescription="{currentUser?.email || currentUser?.id || 'User'}" icon="{UserAvatarFilledAlt}" />
+            <HeaderGlobalAction iconDescription="{currentUser || 'User'}" icon="{UserAvatarFilledAlt}" />
             <HeaderGlobalAction
                 iconDescription="Logout"
                 icon="{Logout}"
