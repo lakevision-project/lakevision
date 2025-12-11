@@ -38,7 +38,6 @@ def get_token(request: Request, token_req: TokenRequest):
     Exchanges the SSO code for an Access Token, sets the token in a secure 
     HTTP-only cookie, and returns minimal user details.
     """
-    # 1. Send code to SSO provider
     data = {
         "grant_type": "authorization_code",
         "code": token_req.code,
@@ -54,43 +53,28 @@ def get_token(request: Request, token_req: TokenRequest):
     token_data = response.json()
     access_token = token_data["access_token"]
     
-    # 2. Get User Info
     user_info_resp = requests.get(
         f"{config.OPENID_PROVIDER_URL}/userinfo",
         headers={'Authorization': f'Bearer {access_token}'}
     )
     user_data = user_info_resp.json()
     
-    # 3. Define the minimal user data to send back to the frontend
     user_return_data = {
-        # Use 'sub' (subject) or 'email' as the primary ID
         "id": user_data.get('sub', user_data.get('email', 'unknown')), 
         "email": user_data.get('email', 'unknown'),
-        # Add any other required public user details
     }
     
-    # --- CHANGE: Create a JSONResponse object to attach the cookie ---
     response_to_client = JSONResponse(content=user_return_data)
-    
-    # 4. Set the HTTP-only Access Token Cookie (The Self-Contained Session)
-    # The FE will not be able to read this due to httponly=True.
-    response_to_client.set_cookie(
-        key="access_token",                  # Name of the cookie
-        value=access_token,                  # The Access Token itself is the session
-        httponly=True,                       # CRITICAL: Prevents client-side JS access (XSS defense)
-        secure=True,                         # CRITICAL: Ensures cookie is only sent over HTTPS
-        samesite="Lax",                      # Recommended defense against CSRF
-        max_age=token_data.get("expires_in", 3600 * 2), # Set cookie lifespan to match token or 2 hours
-        path="/"                             # Available to the entire application
-    )
 
-    # 5. Return the response
+    request.session['user'] = user_data.get('email')
+    request.session['access_token'] = access_token
+
     return response_to_client
 
 @router.get("/api/auth/session")
 def check_session(request: Request):
     # 1. Get the token from the cookie sent by the browser
-    access_token = request.cookies.get("access_token")
+    access_token = request.session.get("access_token")
     
     if not access_token:
         # If no cookie exists, return 401 Unauthorized
@@ -115,19 +99,17 @@ def check_session(request: Request):
     }
 
 @router.post("/api/logout")
-def logout():
+def logout(request: Request):
     """
-    Destroys the secure session cookie to log the user out.
+    Clears the server-side session.
     """
-    response = JSONResponse(content={"message": "Logged out successfully"})
-    
-    # Instruct the browser to delete the cookie by setting its max_age to 0
-    response.delete_cookie(
-        key="access_token", 
-        path="/", 
-        secure=True, 
-        httponly=True, 
-        samesite="Lax"
-    )
-    
-    return response
+    request.session.pop("user", None)
+    request.session.pop("access_token", None)
+    return JSONResponse(content={"message": "Logged out successfully"})
+
+@router.get("/api/logout")
+def logout_get(request: Request):
+    """Fallback GET logout endpoint (original behavior)"""
+    request.session.pop("user", None)
+    request.session.pop("access_token", None)
+    return RedirectResponse(config.REDIRECT_URI)

@@ -47,7 +47,7 @@
     // --- NEW: Configuration Endpoints ---
     const DEFAULT_AUTH_TOKEN_URL = '/api/auth/token';
     const AUTH_TOKEN_EXCHANGE_URL = env.PUBLIC_AUTH_TOKEN_EXCHANGE_URL || DEFAULT_AUTH_TOKEN_URL;
-    // Endpoint must be provided by the backend to check if the session cookie is valid
+    // Endpoint must be provided by the backend to check if the session is valid
     const SESSION_CHECK_URL = env.PUBLIC_SESSION_CHECK_URL || '/api/auth/session'; 
     // --- END NEW CONFIG ---
 
@@ -139,7 +139,7 @@
                 // 1. Redirect from IdP: Exchange code
                 exchangeCodeForToken(code, state);
             } else if (currentUser === null) {
-                // 2. Refresh scenario: Check for existing cookie session
+                // 2. Refresh scenario: Check for existing session
                 const sessionFound = await checkExistingSession();
                 if (!sessionFound) {
                     // 3. If no session and no code, force login
@@ -192,7 +192,7 @@
     }
 
     async function logout() {
-        // --- UPDATED: Use POST fetch to tell backend to destroy HttpOnly cookie ---
+        // --- UPDATED: Use POST fetch to tell backend to destroy HttpOnly ---
         await fetch('/api/logout', { method: 'POST' });
         user.set(null); // Clear store
         // Force reload to trigger session check, which will now fail and redirect to login.

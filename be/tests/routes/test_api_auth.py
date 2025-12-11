@@ -54,7 +54,7 @@ def test_get_token_success(mock_requests_get, mock_requests_post, client: TestCl
     assert response.status_code == 200
     assert response.json() == {'email': 'user@example.com', 'id': 'user@example.com'}
     # Check that the session was set
-    assert client.cookies.get("access_token") is not None
+    assert client.cookies.get("session") is not None
 
 @patch('requests.post')
 def test_get_token_failure(mock_requests_post, client: TestClient):
@@ -69,5 +69,5 @@ def test_logout(client: TestClient):
     # We test the direct outcome (a redirect response) rather than inspect session state
     response = client.post("/api/logout", follow_redirects=False)
     # Check for a redirect status code (307 is used by FastAPI for temporary redirects)
-    assert client.cookies.get("access_token") is None
+    assert client.cookies.get("session") is None
 
