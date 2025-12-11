@@ -163,7 +163,7 @@
         if (response.ok) {
             const data = await response.json();
             console.log('Token exchanged, user data received:', data);
-            user.set(data); // Store the full user object
+            user.set(data.email); // Store the full user object
 
             // Decode the state parameter and redirect, preserving the original URL query
             const decodedState = decodeURIComponent(state || '');
