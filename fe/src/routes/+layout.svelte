@@ -17,65 +17,22 @@
 	} from 'carbon-components-svelte';
 
 	import LogoGithub from 'carbon-icons-svelte/lib/LogoGithub.svelte';
-	import { onMount, tick } from 'svelte';
-	import { goto, afterNavigate } from '$app/navigation';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { Logout, UserAvatarFilledAlt } from 'carbon-icons-svelte';
-	import Chat from '../lib/components/Chat.svelte';
 	import { healthEnabled } from '$lib/stores';
 
 	let user;
 	let isHeaderActionOpen = false;
 	let AUTH_ENABLED = false;
-	let CHAT_ENABLED = false;
-	let CHAT_NAME = 'Chat';
-	let extra_link;
-	let extra_link_text;
+	let extra_links = [];
+	let extra_header_links = [];
 	let company = 'Apache Iceberg';
 	let platform = 'Lakevision';
-
-	let isChatOpen = false;
-	let ignoreUrlSync = false; // guard to prevent re-opening during our own updates
-
-	// initialize from current URL once on mount
-	onMount(() => {
-		isChatOpen = $page.url.searchParams.get('openChat') === 'true';
-	});
-
-	// only sync when navigation finishes (URL actually changed)
-	afterNavigate(() => {
-		if (ignoreUrlSync) return; // skip if change initiated by setChatOpen
-		isChatOpen = $page.url.searchParams.get('openChat') === 'true';
-	});
-
-	async function setChatOpen(open) {
-		if (!browser) return;
-		// immediately reflect in UI
-		isChatOpen = open;
-
-		// update URL without adding history entries
-		const sp = new URLSearchParams($page.url.searchParams);
-		open ? sp.set('openChat', 'true') : sp.delete('openChat');
-		const qs = sp.toString();
-
-		ignoreUrlSync = true;
-		await goto(qs ? `?${qs}` : $page.url.pathname, { replaceState: true, noScroll: true });
-		await tick();               // let Svelte flush
-		ignoreUrlSync = false;      // re-enable URL → state syncing
-	}
-
-	const handleChatClose = () => setChatOpen(false);
-	const handleChatOpen  = () => setChatOpen(true);
-
 
 	onMount(() => {
 		if (env.PUBLIC_AUTH_ENABLED == 'true') {
 			AUTH_ENABLED = true;
-		}
-		if (env.PUBLIC_CHAT_ENABLED == 'true') {
-			if (env.PUBLIC_CHAT_NAME) {
-				CHAT_NAME = env.PUBLIC_CHAT_NAME;
-			}
-			CHAT_ENABLED = true;
 		}
 
 		if (env.PUBLIC_HEALTH_ENABLED == 'true') {
@@ -83,10 +40,20 @@
         } else {
             healthEnabled.set(false);
         }
-		if (env.PUBLIC_EXTRA_LINK) {
-			extra_link = env.PUBLIC_EXTRA_LINK;
-			extra_link_text = env.PUBLIC_EXTRA_LINK_TEXT;
-		}
+		if (env.PUBLIC_EXTRA_LINKS) {
+            try {
+                extra_links = JSON.parse(env.PUBLIC_EXTRA_LINKS);
+            } catch (e) {
+                console.error("Failed to parse PUBLIC_EXTRA_LINKS. Ensure it is valid JSON.", e);
+            }
+        }
+		if (env.PUBLIC_EXTRA_HEADER_LINKS) {
+            try {
+                extra_header_links = JSON.parse(env.PUBLIC_EXTRA_HEADER_LINKS);
+            } catch (e) {
+                console.error("Failed to parse PUBLIC_EXTRA_HEADER_LINKS. Ensure it is valid JSON.", e);
+            }
+        }
 		if (env.PUBLIC_COMPANY_NAME) company = env.PUBLIC_COMPANY_NAME;
 		if (env.PUBLIC_PLATFORM_NAME) platform = env.PUBLIC_PLATFORM_NAME;
 		if (AUTH_ENABLED && user == null) {
@@ -163,10 +130,15 @@
 	<HeaderNavItem href="/" text="Home" />
 	<HeaderNavItem href="/lh-health" text="Lakehouse Health" />
 	
-	{#if CHAT_ENABLED}
-		<HeaderNavItem text="{CHAT_NAME}" href="?openChat=true" />
-	{/if}
-
+	{#if extra_header_links.length > 0}
+        {#each extra_header_links as link}
+            <HeaderNavItem 
+                text="{link.text}" 
+                href="{link.href}" 
+                target="{link.target || '_blank'}" 
+            />
+        {/each}
+    {/if}
 
 	<HeaderUtilities>
 		<HeaderActionLink href="https://github.com/IBM/lakevision" target="_blank">
@@ -180,17 +152,19 @@
 				on:click="{(event) => handleLogout(event)}"
 			/>
 		{/if}
-		{#if extra_link}
-			<HeaderAction bind:isOpen="{isHeaderActionOpen}">
-				<HeaderPanelLinks>
-					<HeaderPanelLink
-						text="{extra_link_text}"
-						href="{extra_link}"
-						target="_blank"
-					></HeaderPanelLink>
-				</HeaderPanelLinks>
-			</HeaderAction>
-		{/if}
+		{#if extra_links.length > 0}
+            <HeaderAction bind:isOpen="{isHeaderActionOpen}">
+                <HeaderPanelLinks>
+                    {#each extra_links as link}
+                        <HeaderPanelLink
+                            text="{link.text}"
+                            href="{link.href}"
+                            target="_blank"
+                        ></HeaderPanelLink>
+                    {/each}
+                </HeaderPanelLinks>
+            </HeaderAction>
+        {/if}
 	</HeaderUtilities>
 </Header>
 
@@ -202,19 +176,5 @@
 	on:click:button--secondary="{() => (showLogin = false)}"
 	on:submit="{login}"
 />
-
-<Modal
-	size='lg'
-	passiveModal
-	bind:open={isChatOpen}
-	modalHeading="{CHAT_NAME}"
-	on:open={handleChatOpen}
-	on:close={handleChatClose}
-	on:click:overlay={handleChatClose}
->
-	{#if user}
-		<Chat {user} />
-	{/if}
-</Modal>
 
 <slot></slot>
