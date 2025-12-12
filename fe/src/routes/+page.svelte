@@ -357,6 +357,7 @@
 	let snapshots_loading = false;
 	let sample_data = [];
 	let sample_data_loading = false;
+	let sample_data_fetched = false;
 	let schema = [];
 	let schema_loading = false;
 	let summary = [];
@@ -768,6 +769,7 @@
 			if (myReq === sampleReq) {
 				sample_data = data;
 				lastSampleLimit = $sample_limit;
+				sample_data_fetched = true;
 			}
 		} catch (err) {
 			if (myReq === sampleReq) {
@@ -779,7 +781,7 @@
 			}
 		}
 	}
-	$: if (selected === 3 && tableKey && !sample_data_loading && (sample_data.length === 0 || $sample_limit !== lastSampleLimit)) {
+	$: if (selected === 3 && tableKey && !sample_data_loading && (!sample_data_fetched || $sample_limit !== lastSampleLimit)) {
 		fetchSampleData();
 	}
 	$: if (tableKey && selected == 0) {
@@ -947,6 +949,7 @@
 		url = url + '/?namespace=' + namespace + '&table=' + table + '&sample_limit=' + $sample_limit;
 	}
 	function reset(table) {
+		sample_data_fetched = false;
 		lastSampleLimit = null;
 		partitions = [];
 		snapshots = [];
@@ -1252,6 +1255,8 @@
 					/>
 					<br />
 					Total items: {partitions.length}
+				{:else}
+					No data
 				{/if}
 			</TabContent>
 			<TabContent
@@ -1303,6 +1308,9 @@
 					/>
 					<br />
 					Sample items: {sample_data.length}
+				{:else}
+					<br />
+					No data
 				{/if}
 			</TabContent>
 			<TabContent>

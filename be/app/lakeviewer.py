@@ -75,6 +75,8 @@ class LakeView():
     
     def get_partition_data(self, table):        
         #table = self.catalog.load_table(table_id)
+        if not table.metadata.current_snapshot_id:
+            return pd.DataFrame()
         pa_partitions = table.inspect.partitions()        
         if pa_partitions.num_rows >1:
             pa_partitions = pa_partitions.sort_by([('partition', 'ascending')])
@@ -82,7 +84,7 @@ class LakeView():
 
     def get_snapshot_data(self, table):        
         if not table.metadata.current_snapshot_id:
-            return []
+            return pd.DataFrame()
         pa_snaps = table.inspect.snapshots().sort_by([('committed_at', 'descending')])
         df = pa_snaps.to_pandas()
         df['committed_at'] = df['committed_at'].apply(lambda x: x.strftime('%Y-%m-%d %H:%M:%S'))
