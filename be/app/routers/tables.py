@@ -97,6 +97,28 @@ def read_partition_specs(table: Table = Depends(get_table)):
 def read_sort_order(table: Table = Depends(get_table)):
     return lv.get_sort_order(table)
 
+@router.get("/api/tables/{table_id}/files", status_code=status.HTTP_200_OK)
+def read_table_files(
+    request: Request,
+    response: Response,
+    table_id: str,
+    offset: int = 0,
+    limit: int = 100,
+    table: Table = Depends(get_table),
+):
+    """A page of the table's data and delete files.
+
+    Paged server-side: the underlying inspect.files() carries full column
+    statistics per file, so a large table would otherwise produce hundreds of
+    megabytes of JSON. Gated by the same authz check as the other data-bearing
+    endpoints, since file paths and per-file row counts describe the data itself.
+    """
+    if not authz_.has_access(request, response, table_id):
+        return
+    df, total = lv.get_file_data(table, offset=offset, limit=limit)
+    records = df_to_records(df) if len(df) else []
+    return {"items": records, "total": total, "offset": offset, "limit": limit}
+
 @router.get("/api/tables/{table_id}/data-change")
 def read_data_change(table: Table = Depends(get_table)):
     return df_to_records(lv.get_data_change(table))

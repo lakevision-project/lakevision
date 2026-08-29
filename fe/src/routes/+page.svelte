@@ -27,6 +27,7 @@
 	import SummaryTab from '$lib/components/table/SummaryTab.svelte';
 	import PartitionsTab from '$lib/components/table/PartitionsTab.svelte';
 	import SnapshotsTab from '$lib/components/table/SnapshotsTab.svelte';
+	import FilesTab from '$lib/components/table/FilesTab.svelte';
 	import SampleDataTab from '$lib/components/table/SampleDataTab.svelte';
 	import HealthTab from '$lib/components/table/HealthTab.svelte';
 	import QueryRunner from '$lib/components/QueryRunner.svelte';
@@ -34,7 +35,7 @@
 	export let data;
 
 	/** Tab order, and the `tab` URL value for each. */
-	const TABS = ['summary', 'partitions', 'snapshots', 'sample', 'sql', 'health'];
+	const TABS = ['summary', 'partitions', 'snapshots', 'files', 'sample', 'sql', 'health'];
 
 	const pageSessionId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
 
@@ -231,6 +232,7 @@
 			<Tab label="Summary" />
 			<Tab label="Partitions" />
 			<Tab label="Snapshots" />
+			<Tab label="Files" />
 			<Tab label="Sample Data" />
 			<Tab label="SQL" />
 			<Tab label="Health Check" />
@@ -258,17 +260,22 @@
 				</TabContent>
 				<TabContent>
 					{#if selectedTab === 3}
-						<SampleDataTab tableKey={$tableKey} {pageSessionId} />
+						<FilesTab tableKey={$tableKey} {pageSessionId} />
 					{/if}
 				</TabContent>
 				<TabContent>
 					{#if selectedTab === 4}
+						<SampleDataTab tableKey={$tableKey} {pageSessionId} />
+					{/if}
+				</TabContent>
+				<TabContent>
+					{#if selectedTab === 5}
 						<br />
 						<QueryRunner tableName={$tableKey} {pageSessionId} />
 					{/if}
 				</TabContent>
 				<TabContent>
-					{#if selectedTab === 5}
+					{#if selectedTab === 6}
 						{#if $healthEnabled}
 							<HealthTab {namespace} {table} onToast={showToast} />
 						{:else}
