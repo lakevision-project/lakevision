@@ -1,3 +1,8 @@
+from app.pyiceberg_compat import apply_patches
+
+# Must run before any catalog or table model is constructed.
+apply_patches()
+
 from pyiceberg import catalog
 from pyiceberg.catalog import Identifier
 from pyiceberg.expressions import AlwaysTrue
