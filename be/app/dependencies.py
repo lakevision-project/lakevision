@@ -8,6 +8,7 @@ from pathlib import Path
 from threading import Timer
 from fastapi import Request, HTTPException
 
+from pyiceberg.exceptions import NoSuchTableError
 from pyiceberg.table import Table
 from app.lakeviewer import LakeView
 from app.storage import get_storage
@@ -165,11 +166,31 @@ def check_auth(request: Request):
 
 # --- Table Loading Dependency ---
 def load_table(table_id: str) -> Table:
+    """Load a table, distinguishing "missing" from "could not be parsed".
+
+    Previously any failure became 404 "Table not found", so a table the catalog
+    lists but pyiceberg cannot parse looked identical to a typo'd name -- and the
+    real cause never reached the logs or the UI.
+    """
     try:
-        logging.info(f"Loading table {table_id}")
+        logging.info("Loading table %s", table_id)
         return lv.load_table(table_id)
-    except Exception:
+    except NoSuchTableError:
         raise HTTPException(status_code=404, detail="Table not found")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        # The catalog knows the table but its metadata could not be read -- e.g.
+        # a field pyiceberg validates more strictly than the Iceberg spec
+        # requires. Report it as a server-side problem and log the detail.
+        logging.exception("Failed to load table %s", table_id)
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                f"Table metadata could not be read: {type(exc).__name__}. "
+                "See server logs for details."
+            ),
+        )
 
 def get_table(request: Request, table_id: str):
     user = None
