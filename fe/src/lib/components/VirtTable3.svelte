@@ -6,6 +6,10 @@
 	import { page } from '$app/stores';
 
 	export let data = [];
+	/**
+	 * Column definition object; callers typically pass `data[0]`, which is
+	 * undefined while a table is being cleared or before the first row arrives.
+	 */
 	export let columns = [];
 	export let rowHeight = 40; // Default height if no array is provided
     export let rowHeights = null; // New prop to accept an array of heights
@@ -14,6 +18,11 @@
 	export let enableSearch = false;
 	export let disableVirtualization = false; // New prop to disable virtualization
 	let containerRef;
+
+	// Never call Object.keys on a null/undefined `columns`: clearing the table
+	// selection briefly leaves it unset while this component is still mounted,
+	// which threw "Cannot convert undefined or null to object".
+	$: columnKeys = columns && typeof columns === 'object' ? Object.keys(columns) : [];
 
 	// Sorting state
 	let sortKey = null;
@@ -160,7 +169,7 @@
 		}
 	}
 	function resetColumnWidths() {
-		columnWidths = Object.keys(columns).reduce((acc, key) => {
+		columnWidths = columnKeys.reduce((acc, key) => {
 			acc[key] = defaultColumnWidth;
 			return acc;
 		}, {});
@@ -200,7 +209,7 @@
 	style="height: {disableVirtualization ? 'auto' : tableHeight + 'px'}"
 >
 	<div class="sticky-header">
-		{#each Object.keys(columns) as key}
+		{#each columnKeys as key}
 			<div
 				class="header-cell"
 				style="width: {columnWidths[key] || defaultColumnWidth}px"
@@ -234,7 +243,7 @@
 					class="row virtual"
 					style="transform: translateY({virtualRow.start}px); height: {virtualRow.size}px;"
 				>
-					{#each Object.keys(columns) as key}
+					{#each columnKeys as key}
 						<div
 							class="cell"
 							role="button"
@@ -258,7 +267,7 @@
 		<div class="simple-body">
 			{#each displayedData as row, rowIndex (row.id ?? rowIndex)}
 				<div class="row">
-					{#each Object.keys(columns) as key}
+					{#each columnKeys as key}
 						<div
 							class="cell"
 							role="button"

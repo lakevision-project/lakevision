@@ -51,10 +51,17 @@
 	let namespaceQuery = '';
 	let tableQuery = '';
 
-	// Carbon's ComboBox is driven by selectedId; map the selected name to its id
-	// so external selection (a URL, or a click in the browse modal) reflects here.
-	$: namespaceId = $namespaceList.find((n) => n.text === $selectedNamespce)?.id ?? null;
-	$: tableId = $tablesInNamespace.find((t) => t.text === $selectedTable)?.id ?? null;
+	// Carbon's ComboBox is driven by selectedId, kept in sync with the stores here.
+	//
+	// `undefined` -- never `null` -- means "nothing selected". Carbon 0.111 starts
+	// its internal `prevSelectedId` at null and only dispatches `select` when
+	// prevSelectedId !== null (it treats null as "initial render"). Passing null
+	// therefore lands in its populated branch, leaves prevSelectedId at null, and
+	// suppresses the event forever -- which is why picking from these dropdowns did
+	// nothing while the browse modal, which writes the stores directly, worked.
+	// Passing undefined takes the branch that resets prevSelectedId properly.
+	$: namespaceId = $namespaceList.find((n) => n.text === $selectedNamespce)?.id;
+	$: tableId = $tablesInNamespace.find((t) => t.text === $selectedTable)?.id;
 
 	$: filteredNamespaces = $namespaceList.filter((ns) =>
 		ns.text.toLowerCase().includes(namespaceQuery.toLowerCase())
@@ -75,14 +82,26 @@
 
 	/** @param {CustomEvent<any>} event */
 	function onNamespacePick(event) {
-		const picked = $namespaceList.find((n) => n.id === event.detail.selectedId);
+		const picked = $namespaceList.find((n) => n.id === event.detail?.selectedId);
+		// Clearing the namespace must clear the table too: the table list it came
+		// from is no longer loaded, so keeping the selection would leave the panel
+		// showing a table that is no longer reachable from the picker.
 		selectNamespace(picked ? picked.text : '');
 	}
 
 	/** @param {CustomEvent<any>} event */
 	function onTablePick(event) {
-		const picked = $tablesInNamespace.find((t) => t.id === event.detail.selectedId);
+		const picked = $tablesInNamespace.find((t) => t.id === event.detail?.selectedId);
 		selectedTable.set(picked ? picked.text : '');
+	}
+
+	/** Carbon dispatches `clear` from the x button; `select` may not follow. */
+	function onNamespaceClear() {
+		selectNamespace('');
+	}
+
+	function onTableClear() {
+		selectedTable.set('');
 	}
 
 	async function openAllTables() {
@@ -140,11 +159,12 @@
 	<SideNavItems>
 		<div class="nav-section">
 			<ComboBox
-				titleText="Namespace"
+				labelText="Namespace"
 				items={$namespaceList}
 				selectedId={namespaceId}
 				{shouldFilterItem}
 				on:select={onNamespacePick}
+				on:clear={onNamespaceClear}
 				let:item
 			>
 				<div><strong>{item.text}</strong></div>
@@ -154,12 +174,13 @@
 
 		<div class="nav-section">
 			<ComboBox
-				titleText="Table"
+				labelText="Table"
 				disabled={$tablesLoading}
 				items={$tablesInNamespace}
 				selectedId={tableId}
 				{shouldFilterItem}
 				on:select={onTablePick}
+				on:clear={onTableClear}
 				let:item
 			>
 				<div><strong>{item.text}</strong></div>
