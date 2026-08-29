@@ -1,8 +1,26 @@
+# Secrets / local config
 .env
-dev/warehouse
-.DS_Store
-be/app/__pycache__
+.env.*
+!.env.example
+fe/.env
+
+# Python
 be/.venv/
-be/*warehouse*/
 **/__pycache__/
+be/app/__pycache__
 *.pyc
+.mypy_cache/
+.pytest_cache/
+*.egg-info/
+
+# Node / SvelteKit build output
+node_modules/
+fe/.svelte-kit/
+fe/build/
+
+# Local sample catalog & warehouse
+dev/warehouse
+be/*warehouse*/
+
+# OS cruft
+.DS_Store
