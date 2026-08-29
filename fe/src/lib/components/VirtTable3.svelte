@@ -311,8 +311,10 @@
 	.header-cell,
 	.cell {
 		position: relative;
-		padding: 8px;
-		border: 1px solid var(--cds-ui-03, #e0e0e0);
+		padding: 6px 12px;
+		/* Horizontal rules only: a full grid on every cell made dense data noisy. */
+		border: none;
+		border-bottom: 1px solid var(--cds-ui-03, #e0e0e0);
 		text-align: left;
 		white-space: nowrap;
 		width: 200px;
@@ -327,12 +329,23 @@
 		color: var(--cds-text-01, #161616);
 		cursor: pointer;
 		user-select: none;
+		font-size: 0.75rem;
+		font-weight: 600;
+		letter-spacing: 0.02em;
+		border-bottom: 1px solid var(--cds-ui-03, #e0e0e0);
 	}
 	.header-cell:hover {
 		background-color: var(--cds-ui-03, #e0e0e0);
 	}
 	.cell {
 		color: var(--cds-text-01, #161616);
+		font-size: 0.8125rem;
+		/* Numeric columns line up when digits are tabular. */
+		font-variant-numeric: tabular-nums;
+	}
+	.row:hover .cell,
+	.simple-body .row:hover .cell {
+		background-color: var(--cds-layer, #f4f4f4);
 	}
 	.resize-handle {
 		position: absolute;

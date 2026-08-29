@@ -74,7 +74,9 @@
 		margin-bottom: 20px;
 	}
 	.total {
-		margin-top: 1rem;
+		margin-top: 0.75rem;
+		font-size: 0.8125rem;
 		color: var(--cds-text-02, #525252);
+		font-variant-numeric: tabular-nums;
 	}
 </style>
