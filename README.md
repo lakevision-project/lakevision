@@ -124,7 +124,7 @@ docker build --build-arg ENABLE_SAMPLE_CATALOG=true -t lakevision:1.0 .
 ### Prerequisites
 
 * Python 3.10+
-* Node.js 18+
+* Node.js 20+
 * A running Iceberg catalog
 
 ### 🔀 With Makefile (recommended)
@@ -278,6 +278,76 @@ scheduler: python -m app.scheduler
 # 2. The worker process
 worker: python -m app.worker
 
+
+## 💻 One-Command Local Run (single origin)
+
+The Makefile flow above runs the backend and frontend as two processes on two
+ports. `run-local.sh` is an alternative for when you want the deployed topology:
+it starts the backend, the frontend, and a small router on **one** port --
+mirroring what nginx does in the container, so relative `/api/...` requests work
+with no CORS configuration.
+
+```bash
+cp my.env .env.local     # then fill in your catalog + object-store settings
+./run-local.sh           # -> http://localhost:8081
+```
+
+It reads `.env.local` by default (pass another path as the first argument), waits
+until the API actually answers before printing the URL, and shuts every child
+process down on Ctrl-C. Ports can be overridden with `PORT`, `BE_PORT`, `FE_PORT`.
+
+Object-store credentials must be visible to **both** layers: pyiceberg reads
+metadata and manifests via `PYICEBERG_CATALOG__DEFAULT__S3__*`, while Daft and
+PyArrow read the parquet data files via the standard `AWS_*` variables. Setting
+only one of the two yields a catalog that lists tables but fails on Sample Data
+and Partitions.
+
+> `.env*` is gitignored (except `.env.example`). Keep credentials out of commits.
+
+## 🔒 Security Configuration
+
+Two settings matter for any deployment that is not a local experiment.
+
+### `SECRET_KEY` (required with auth)
+
+Signs the session cookie. When `PUBLIC_AUTH_ENABLED=true`, the app **refuses to
+start** unless this is set — signing sessions with a predictable key would let
+anyone forge a session and bypass authentication. Generate one with:
+
+```bash
+python -c 'import secrets; print(secrets.token_urlsafe(32))'
+```
+
+Without auth enabled, an ephemeral key is generated at startup, so sessions do
+not survive a restart. Set it explicitly for any persistent deployment.
+
+> **Upgrading:** releases before this change fell back to a hardcoded key. Setting
+> `SECRET_KEY` (or upgrading without it) invalidates existing session cookies, so
+> logged-in users are signed out once.
+
+### `CORS_ALLOW_ORIGINS` (leave empty by default)
+
+Comma-separated list of origins permitted to make credentialed cross-origin API
+calls. The bundled nginx serves the frontend and backend on one origin, so this
+should normally stay empty — CORS is then disabled entirely.
+
+Do not set it to `*`. Combined with cookie credentials, a wildcard lets any
+website issue session-authenticated requests on a logged-in user's behalf (CSRF).
+The app ignores `*` and logs a warning rather than honouring it.
+
+### SQL query validation
+
+The "SQL" tab accepts a user-supplied query. It is validated **server-side**
+(`be/app/sql_guard.py`) and restricted to a single `SELECT` against the currently
+selected table. Joins, unions, CTEs, subqueries, and Daft's file-reading
+functions (`read_parquet`, `read_csv`, …) are rejected — the latter would
+otherwise read arbitrary paths using the backend's own storage credentials,
+bypassing the catalog and any authorization plugin. The frontend performs the
+same checks for fast feedback, but the server is the enforcement point.
+
+If you extend the query feature, keep the allowlist in `sql_guard.py` in front of
+`daft.sql()`; the tests in `be/tests/test_sql_guard.py` and
+`be/tests/test_sample_data_integration.py` cover the exploit cases.
 
 ## 🧭 Roadmap
 
