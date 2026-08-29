@@ -11,15 +11,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
-	import {
-		Content,
-		CopyButton,
-		Tab,
-		TabContent,
-		Tabs,
-		Tile,
-		ToastNotification
-	} from 'carbon-components-svelte';
+	import { Content, Tab, TabContent, Tabs, ToastNotification } from 'carbon-components-svelte';
 
 	import { healthEnabled, HEALTH_DISABLED_MESSAGE, sample_limit, selectedNamespce, selectedTable } from '$lib/stores';
 	import {
@@ -29,6 +21,9 @@
 		tableKey
 	} from '$lib/api/catalog';
 	import CatalogNav from '$lib/components/table/CatalogNav.svelte';
+	import TableHeader from '$lib/components/table/TableHeader.svelte';
+	import CatalogOverview from '$lib/components/table/CatalogOverview.svelte';
+	import { rememberTable } from '$lib/recent';
 	import SummaryTab from '$lib/components/table/SummaryTab.svelte';
 	import PartitionsTab from '$lib/components/table/PartitionsTab.svelte';
 	import SnapshotsTab from '$lib/components/table/SnapshotsTab.svelte';
@@ -147,6 +142,34 @@
 		}
 	}
 
+	// Short facts for the header. Loaded here (cheap, cached per page session) so
+	// the header does not depend on which tab happens to be mounted.
+	$: if (browser && namespace && table) rememberTable(namespace, table);
+
+	let headerTags = [];
+	$: if ($tableKey) loadHeaderTags($tableKey);
+	else headerTags = [];
+
+	/** @param {string} key */
+	async function loadHeaderTags(key) {
+		const forKey = key;
+		try {
+			const res = await fetch(`/api/tables/${encodeURIComponent(key)}/summary`, {
+				headers: { 'Content-Type': 'application/json', 'X-Page-Session-ID': pageSessionId }
+			});
+			if (!res.ok) throw new Error(res.statusText);
+			const summary = await res.json();
+			if (forKey !== $tableKey) return; // superseded
+			const tags = [];
+			if (summary['Format version']) tags.push({ text: `Iceberg v${summary['Format version']}` });
+			const deletes = Number(String(summary['Total delete files'] ?? '0').replace(/,/g, ''));
+			if (deletes > 0) tags.push({ text: `${deletes.toLocaleString()} delete files`, type: 'magenta' });
+			headerTags = tags;
+		} catch {
+			headerTags = [];
+		}
+	}
+
 	// --- toasts -------------------------------------------------------------
 
 	let toasts = [];
@@ -188,40 +211,21 @@
 	</div>
 
 	{#if !namespace && !table}
-		<Tile>
-			<div class="empty-state">
-				<h3>Explore your lakehouse</h3>
-				<p>
-					Select a namespace from the sidebar to browse its tables, or choose
-					<strong>Show All Tables</strong> to search across every namespace.
-				</p>
-				<p class="empty-hint">
-					{($namespaceList ?? []).length} namespace{($namespaceList ?? []).length === 1 ? '' : 's'} available.
-				</p>
-			</div>
-		</Tile>
+		<CatalogOverview />
+	{:else if namespace && !table}
+		<TableHeader {namespace} table="" {shareUrl} onCopyRequest={buildShareUrl} tags={[]} />
+		<div class="pick-table">
+			<p>Select a table in <strong>{namespace}</strong> to see its schema, snapshots and data.</p>
+			<p class="hint">Use the Table picker in the sidebar, or <strong>Show All Tables</strong>.</p>
+		</div>
 	{:else}
-		<Tile>
-			<div class="tile-header">
-				<div class="tile-content">
-					<dl class="namespace-table-list">
-						<dt>Namespace</dt>
-						<dd>{namespace || '—'}</dd>
-						<dt>Table</dt>
-						<dd>{table || '—'}</dd>
-					</dl>
-				</div>
-				<div class="copy-button-container">
-					<CopyButton
-						text={shareUrl}
-						on:click={buildShareUrl}
-						iconDescription="Copy table link"
-						feedback="Table link copied"
-					/>
-				</div>
-			</div>
-		</Tile>
-		<br />
+		<TableHeader
+			{namespace}
+			{table}
+			{shareUrl}
+			onCopyRequest={buildShareUrl}
+			tags={headerTags}
+		/>
 
 		<Tabs bind:selected={selectedTab}>
 			<Tab label="Summary" />
@@ -327,6 +331,17 @@
 	}
 	.empty-state p {
 		margin-bottom: 0.5rem;
+	}
+	.pick-table {
+		padding: 3rem 0;
+		color: var(--cds-text-02, #525252);
+		max-width: 34rem;
+	}
+	.pick-table p {
+		margin: 0 0 0.5rem;
+	}
+	.pick-table .hint {
+		font-size: 0.8125rem;
 	}
 	.empty-hint {
 		color: var(--cds-text-secondary, #525252);

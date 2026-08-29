@@ -189,3 +189,21 @@ span.bx--text-truncate--end {
 		margin-left: 3rem;
 	}
 }
+
+/* Six tabs do not fit a phone. Let the tab strip scroll inside itself rather
+   than widening the page, which forced the whole document to scroll sideways. */
+@media (max-width: 672px) {
+	.bx--tabs .bx--tabs__nav {
+		overflow-x: auto;
+		flex-wrap: nowrap;
+		scrollbar-width: thin;
+		-webkit-overflow-scrolling: touch;
+	}
+	.bx--tabs .bx--tabs__nav-item {
+		flex: 0 0 auto;
+	}
+	/* The content area must not be widened by its children either. */
+	.bx--content {
+		overflow-x: hidden;
+	}
+}
