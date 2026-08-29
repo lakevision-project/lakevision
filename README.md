@@ -124,7 +124,7 @@ docker build --build-arg ENABLE_SAMPLE_CATALOG=true -t lakevision:1.0 .
 ### Prerequisites
 
 * Python 3.10+
-* Node.js 20+
+* Node.js 24+ (or 22; both are current LTS lines)
 * A running Iceberg catalog
 
 ### 🔀 With Makefile (recommended)
