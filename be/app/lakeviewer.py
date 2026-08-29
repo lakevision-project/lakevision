@@ -34,7 +34,9 @@ class LakeView():
                 })
         else:
             self.catalog = catalog.load_catalog("default")        
-        self.namespace_options = []        
+        self.namespace_options = []
+        # Keyed by (table name, snapshot id); see get_file_data.
+        self._files_cache = {}
 
     def get_namespaces(_self, include_nested: bool = True):
         result = []
@@ -96,6 +98,99 @@ class LakeView():
         df['id'] = df.index
         return df
     
+    # Manifest entry content codes, per the Iceberg spec.
+    _FILE_CONTENT = {0: "Data", 1: "Position deletes", 2: "Equality deletes"}
+
+    def get_file_data(self, table, offset: int = 0, limit: int = 100):
+        """Return a page of the table's data/delete files, newest spec first.
+
+        `inspect.files()` returns one row per file with full column statistics --
+        lower/upper bounds as raw binary maps and a deeply nested
+        `readable_metrics` struct. Serialising all of that for a large table is
+        not viable: a 15,395-file table produces ~300 MB of JSON and takes
+        several seconds. So this selects the columns that are useful in a listing
+        and pages server-side.
+
+        Returns (records, total_count).
+        """
+        if not table.metadata.current_snapshot_id:
+            return [], 0
+
+        # inspect.files() reads every manifest, which is the expensive part and is
+        # identical for every page of the same snapshot. Cache the arrow table per
+        # (table, snapshot) so paging does not pay that cost repeatedly.
+        cache_key = (table.name(), table.metadata.current_snapshot_id)
+        pa_files = self._files_cache.get(cache_key)
+        if pa_files is None:
+            pa_files = table.inspect.files()
+            # Small bound: these are big objects and users page one table at a time.
+            if len(self._files_cache) >= 4:
+                self._files_cache.pop(next(iter(self._files_cache)))
+            self._files_cache[cache_key] = pa_files
+        total = pa_files.num_rows
+        if total == 0:
+            return [], 0
+
+        offset = max(0, int(offset))
+        limit = max(1, min(int(limit), 1000))
+        if offset >= total:
+            return [], total
+
+        # Slice before converting, so only the requested page is materialised.
+        page = pa_files.slice(offset, limit)
+
+        keep = [
+            name
+            for name in (
+                "content",
+                "file_path",
+                "file_format",
+                "spec_id",
+                "partition",
+                "record_count",
+                "file_size_in_bytes",
+                "sort_order_id",
+            )
+            if name in page.schema.names
+        ]
+        df = page.select(keep).to_pandas()
+
+        if "content" in df.columns:
+            df["content"] = df["content"].map(
+                lambda c: self._FILE_CONTENT.get(int(c), f"Unknown ({c})")
+                if pd.notna(c)
+                else ""
+            )
+        if "file_format" in df.columns:
+            df["file_format"] = df["file_format"].astype(str)
+        if "partition" in df.columns:
+            # A struct renders as an unreadable dict; flatten to "key=value".
+            df["partition"] = df["partition"].map(self._format_partition)
+
+        rename = {
+            "content": "Content",
+            "file_path": "File path",
+            "file_format": "Format",
+            "spec_id": "Spec",
+            "partition": "Partition",
+            "record_count": "Records",
+            "file_size_in_bytes": "Size (bytes)",
+            "sort_order_id": "Sort order",
+        }
+        df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
+        # Stable row identity for the UI's keyed each-blocks.
+        df["id"] = range(offset, offset + len(df))
+        return df, total
+
+    @staticmethod
+    def _format_partition(value):
+        """Render a partition struct as "col=value", or "" when unpartitioned."""
+        if not value:
+            return ""
+        if isinstance(value, dict):
+            return ", ".join(f"{k}={v}" for k, v in value.items() if v is not None)
+        return str(value)
+
     def get_data_change(self, table):        
         #table = self.catalog.load_table(table_id)
         pa_snaps = table.inspect.snapshots().sort_by([('committed_at', 'ascending')])
