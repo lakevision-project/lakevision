@@ -24,13 +24,25 @@
 	let popoverContent = '';
 	let popoverPosition = { top: 0, left: 0 };
 	export let columnWidths = {};
+	/**
+	 * Namespaces persisted column widths. Every instance previously shared one
+	 * "columnWidths" key, so resizing a column in one table corrupted the widths
+	 * of every other table -- they have entirely different column sets.
+	 */
+	export let storageKey = 'default';
 	let startX, startWidth, columnKey;
 	let searchQuery = '';
 
+	$: storageId = `lakevision.columnWidths.${storageKey}`;
+
 	onMount(() => {
-		const storedWidths = localStorage.getItem('columnWidths');
-		if (storedWidths) {
-			columnWidths = JSON.parse(storedWidths);
+		try {
+			const stored = localStorage.getItem(storageId);
+			if (stored) columnWidths = { ...columnWidths, ...JSON.parse(stored) };
+		} catch (err) {
+			// Malformed or unavailable storage (private mode, disabled cookies)
+			// must not take the table down.
+			console.warn('Ignoring stored column widths:', err);
 		}
 	});
 
@@ -60,16 +72,27 @@
 		.filter(({ searchString }) => searchString.includes(searchQuery.toLowerCase()))
 		.map(({ original }) => original);
 
-	$: displayedData = [...filteredData].sort((a, b) => {
-		if (!sortKey) return 0;
-		if (a[sortKey] < b[sortKey]) return sortOrder === 'asc' ? -1 : 1;
-		if (a[sortKey] > b[sortKey]) return sortOrder === 'asc' ? 1 : -1;
-		return 0;
-	});
+	$: displayedData = sortKey ? [...filteredData].sort(compareRows) : filteredData;
+
+	/** Compare two rows on the active sort column, numerically where possible. */
+	function compareRows(a, b) {
+		const direction = sortOrder === 'asc' ? 1 : -1;
+		const left = a?.[sortKey];
+		const right = b?.[sortKey];
+		if (left === right) return 0;
+		if (left === null || left === undefined) return 1; // nulls last
+		if (right === null || right === undefined) return -1;
+		const leftNum = Number(left);
+		const rightNum = Number(right);
+		if (!Number.isNaN(leftNum) && !Number.isNaN(rightNum)) {
+			return (leftNum - rightNum) * direction;
+		}
+		return String(left).localeCompare(String(right)) * direction;
+	}
 
 	// Virtualizer instance
 	$: rowVirtualizer = createVirtualizer({
-		count: filteredData.length,
+		count: displayedData.length,
 		getScrollElement: () => containerRef,
 		// Use the array of heights if provided, otherwise use the single rowHeight prop
 		estimateSize: (index) => (rowHeights && rowHeights[index] ? rowHeights[index] : rowHeight)
@@ -122,21 +145,30 @@
 	function handleMouseMove(event) {
 		const newWidth = startWidth + (event.clientX - startX);
 		columnWidths[columnKey] = Math.max(newWidth, 50);
-		saveColumnWidths();
 	}
 	function handleMouseUp() {
 		document.removeEventListener('mousemove', handleMouseMove);
 		document.removeEventListener('mouseup', handleMouseUp);
+		// Persist once per drag rather than on every mousemove event.
+		saveColumnWidths();
 	}
 	function saveColumnWidths() {
-		localStorage.setItem('columnWidths', JSON.stringify(columnWidths));
+		try {
+			localStorage.setItem(storageId, JSON.stringify(columnWidths));
+		} catch (err) {
+			console.warn('Could not persist column widths:', err);
+		}
 	}
 	function resetColumnWidths() {
 		columnWidths = Object.keys(columns).reduce((acc, key) => {
 			acc[key] = defaultColumnWidth;
 			return acc;
 		}, {});
-		localStorage.removeItem('columnWidths');
+		try {
+			localStorage.removeItem(storageId);
+		} catch {
+			/* nothing to clean up */
+		}
 		return '';
 	}
 	function escapeHtml(text) {
@@ -148,7 +180,6 @@
 			.replace(/'/g, '&#039;');
 	}
 	function highlightMatch(text, query) {
-		console.log(text)
 		if (!query || !text) return escapeHtml(text);
 		const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
 		return escapeHtml(text).replace(regex, '<mark>$1</mark>');
@@ -225,7 +256,7 @@
 		</div>
 	{:else}
 		<div class="simple-body">
-			{#each displayedData as row (row.id)}
+			{#each displayedData as row, rowIndex (row.id ?? rowIndex)}
 				<div class="row">
 					{#each Object.keys(columns) as key}
 						<div
@@ -263,7 +294,7 @@
 	.sticky-header {
 		position: sticky;
 		top: 0;
-		background-color: #f4f4f4;
+		background-color: var(--cds-ui-01, #f4f4f4);
 		z-index: 2;
 		display: flex;
 		width: fit-content;
@@ -272,7 +303,7 @@
 	.cell {
 		position: relative;
 		padding: 8px;
-		border: 1px solid #ddd;
+		border: 1px solid var(--cds-ui-03, #e0e0e0);
 		text-align: left;
 		white-space: nowrap;
 		width: 200px;
@@ -281,6 +312,18 @@
 		box-sizing: border-box;
 		display: flex;
 		align-items: center;
+	}
+	.header-cell {
+		background-color: var(--cds-ui-01, #f4f4f4);
+		color: var(--cds-text-01, #161616);
+		cursor: pointer;
+		user-select: none;
+	}
+	.header-cell:hover {
+		background-color: var(--cds-ui-03, #e0e0e0);
+	}
+	.cell {
+		color: var(--cds-text-01, #161616);
 	}
 	.resize-handle {
 		position: absolute;
@@ -299,7 +342,7 @@
 	.simple-body .row {
 		display: flex;
 		width: fit-content;
-		border-bottom: 1px solid #ddd;
+		border-bottom: 1px solid var(--cds-ui-03, #e0e0e0);
 	}
 	.simple-body .row:last-child {
 		border-bottom: none;
