@@ -1,109 +1,191 @@
+/*
+ * Global overrides on top of Carbon.
+ *
+ * Colours must come from var(--cds-*) tokens: Carbon redefines those per theme
+ * under :root[theme=...], so tokenised rules follow the light/dark switch for
+ * free while hardcoded hex values do not.
+ */
+
+/* Content gutters. Percentage margins wasted ~20% of the width on a laptop,
+   which wide Iceberg schemas need; scale them down as the viewport narrows. */
 .bx--content {
 	margin-left: 10%;
-    margin-right: 10%;
+	margin-right: 10%;
+}
+
+@media (max-width: 1584px) {
+	.bx--content {
+		margin-left: 5%;
+		margin-right: 5%;
+	}
+}
+
+@media (max-width: 1056px) {
+	.bx--content {
+		margin-left: 1rem;
+		margin-right: 1rem;
+	}
+}
+
+@media (max-width: 672px) {
+	.bx--content {
+		margin-left: 0.5rem;
+		margin-right: 0.5rem;
+		padding: 1rem 0.5rem;
+	}
+}
+
+/* The side nav was pinned to #161616 with white text, so the app looked
+   half-dark in light mode. Follow the theme instead. */
+.bx--side-nav__navigation {
+	background-color: var(--cds-ui-01, #f4f4f4);
 }
 
 .bx--side-nav__navigation .bx--label {
 	margin-left: 15px;
-	color: #fff;
+	color: var(--cds-text-02, #525252);
 	font-weight: bold;
 }
 
-.bx--side-nav__navigation {
-	background-color: #161616;
+/* Carbon 0.86 hardcodes `color: #525252` on this selector rather than using a
+   token, so nav links stay dark grey in dark mode -- about 1.9:1 against the
+   #262626 nav surface, effectively invisible. Match its specificity
+   (a.bx--side-nav__link > .bx--side-nav__link-text) to override with a token. */
+a.bx--side-nav__link > .bx--side-nav__link-text,
+.bx--side-nav a.bx--header__menu-item .bx--text-truncate-end {
+	color: var(--cds-text-01, #161616);
+}
+
+.bx--side-nav__navigation .bx--side-nav__link:hover {
+	background-color: var(--cds-ui-03, #e0e0e0);
 }
 
 .bx--side-nav__link .bx--side-nav__icon svg {
-	fill: #ffffff;
+	fill: var(--cds-icon-01, #161616);
 }
 
+/* Search highlight: pure yellow on white is unreadable against a dark
+   background, so pick the accent per theme. */
 mark {
-    background-color: rgb(254, 254, 0);
-    color: inherit;
-    padding: 0;
-    font-weight: bold;
+	background-color: var(--cds-highlight, #d0e2ff);
+	color: var(--cds-text-01, #161616);
+	padding: 0;
+	font-weight: bold;
 }
+
 button.cds--btn--icon-only {
-    min-width: 2.5rem !important;
-    width: 2.5rem !important;
-    flex-grow: 0 !important;
+	min-width: 2.5rem !important;
+	width: 2.5rem !important;
+	flex-grow: 0 !important;
 }
 
 .legend-with-icon {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-bottom: 1rem;
 }
 
 .info-button {
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    color: var(--cds-interactive-01, #0f62fe);
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	color: var(--cds-interactive-01, #0f62fe);
 }
 
 .rules-table {
-    width: 100%;
-    border-collapse: collapse;
+	width: 100%;
+	border-collapse: collapse;
 }
 
 .rules-table th,
 .rules-table td {
-    border: 1px solid var(--cds-border-subtle, #e0e0e0);
-    padding: 0.75rem;
-    text-align: left;
-    vertical-align: top;
+	border: 1px solid var(--cds-ui-03, #e0e0e0);
+	padding: 0.75rem;
+	text-align: left;
+	vertical-align: top;
 }
 
 .rules-table th {
-    background-color: var(--cds-background-hover, #f4f4f4);
-    font-weight: 600;
+	background-color: var(--cds-ui-01, #f4f4f4);
+	font-weight: 600;
 }
 
 .rules-cell-container {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 8px;
-    width: 100%;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding: 8px;
+	width: 100%;
 }
+
 .rule-item {
-    padding: 4px;
-    border-radius: 4px;
-    transition: background-color 0.2s;
+	padding: 4px;
+	border-radius: 4px;
+	transition: background-color 0.2s;
 }
+
 .rule-item-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	cursor: pointer;
 }
+
 .rule-details {
-    margin-top: 0.5rem;
-    padding-left: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+	margin-top: 0.5rem;
+	padding-left: 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
 }
+
 .message-card {
-    background-color: var(--cds-background, #fff);
-    border-left: 3px solid var(--cds-support-03, #ff832b);
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+	background-color: var(--cds-layer, #f4f4f4);
+	border-left: 3px solid var(--cds-support-03, #ff832b);
+	padding: 0.5rem 1rem;
+	border-radius: 4px;
 }
+
 .message-card p {
-    margin: 0.2rem 0;
-    font-size: 13px;
+	margin: 0.2rem 0;
+	font-size: 13px;
 }
 
 .header-cell {
-    font-weight: bold
+	font-weight: bold;
 }
 
 span.bx--text-truncate--end {
-    font-weight: 700 !important;
+	font-weight: 700 !important;
+}
+
+/* Wide content must scroll inside its own container rather than making the
+   whole page scroll sideways. */
+.bx--content table {
+	max-width: 100%;
+}
+
+/* Inline links in prose (e.g. the health-disabled notice) render as bare <a>
+   with no Carbon class, so they inherit the light-mode blue. On g100 that is
+   3.62:1 against the page background -- below AA. --cds-link-01 is theme-aware
+   (#0f62fe light, #78a9ff dark). */
+.bx--content a:not([class]),
+.bx--content a[class=''] {
+	color: var(--cds-link-01, #0f62fe);
+}
+
+.bx--content a:not([class]):hover {
+	color: var(--cds-hover-primary-text, #0043ce);
+}
+
+/* When the catalog nav collapses it renders its own toggle in the top-left of
+   the header strip, so shift the header's brand text clear of it. */
+@media (max-width: 1055px) {
+	.bx--header__name {
+		margin-left: 3rem;
+	}
 }

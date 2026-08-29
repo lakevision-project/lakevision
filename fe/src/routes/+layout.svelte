@@ -17,10 +17,12 @@
     } from 'carbon-components-svelte';
 
     import LogoGithub from 'carbon-icons-svelte/lib/LogoGithub.svelte';
-    import { onMount } from 'svelte';
+    import { onDestroy, onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { Logout, UserAvatarFilledAlt } from 'carbon-icons-svelte';
-    import { user, healthEnabled } from '$lib/stores'; 
+    import { user, healthEnabled } from '$lib/stores';
+    import { initTheme } from '$lib/theme';
+    import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 
     const AUTH_ENABLED = (env.PUBLIC_AUTH_ENABLED || 'true').toLowerCase() === 'true';
 
@@ -65,7 +67,16 @@
     }
 
 
+    // Registered synchronously during init: onDestroy cannot be called from an
+    // async onMount, since that resumes outside component initialisation.
+    let disposeTheme = () => {};
+    onDestroy(() => disposeTheme());
+
     onMount(async () => {
+        // Returns a cleanup function so the prefers-color-scheme listener is
+        // removed on destroy instead of leaking.
+        disposeTheme = initTheme();
+
         if (env.PUBLIC_HEALTH_ENABLED == 'true') {
             healthEnabled.set(true);
         } else {
@@ -184,7 +195,8 @@
     {/if}
 
     <HeaderUtilities>
-        <HeaderActionLink href="https://github.com/IBM/lakevision" target="_blank">
+        <ThemeToggle />
+        <HeaderActionLink href="https://github.com/lakevision-project/lakevision" target="_blank">
             <LogoGithub slot="icon" size="{20}" />
         </HeaderActionLink>
         {#if AUTH_ENABLED}
