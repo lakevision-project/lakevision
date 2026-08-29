@@ -69,13 +69,20 @@ app = FastAPI(
 
 # --- Middleware ---
 app.add_middleware(SessionMiddleware, secret_key=config.SECRET_KEY, max_age=7200)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Only enable CORS when explicit origins are configured. Credentialed wildcard
+# CORS is spec-invalid and would let any site make session-authenticated requests.
+_cors_origins = [o for o in config.CORS_ALLOW_ORIGINS if o != "*"]
+if _cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Page-Session-ID"],
+    )
+    logging.info("CORS enabled for origins: %s", ", ".join(_cors_origins))
+else:
+    logging.info("CORS disabled (no CORS_ALLOW_ORIGINS configured; same-origin only).")
 
 # --- Exception Handlers ---
 @app.exception_handler(LVException)

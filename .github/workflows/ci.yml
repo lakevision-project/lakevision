@@ -23,7 +23,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install Python dependencies
         working-directory: ./be
@@ -44,9 +44,15 @@ jobs:
         working-directory: ./fe
         run: npm ci
 
-      - name: Lint frontend
+      # Not yet blocking: 21 files have pre-existing Prettier formatting drift.
+      # Reformatting them is a large diff unrelated to any current change, so it
+      # is deliberately deferred rather than hidden -- the step reports the
+      # result and continues. Remove continue-on-error once `npm run format`
+      # has been run across the tree.
+      - name: Lint frontend (non-blocking)
         working-directory: ./fe
-        run: npm run lint || echo "Linting failed"
+        continue-on-error: true
+        run: npm run lint
 
       - name: Check frontend builds
         working-directory: ./fe

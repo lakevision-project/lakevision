@@ -1,5 +1,6 @@
 import time
 import logging
+from collections import OrderedDict
 import importlib
 import importlib.util
 import sys
@@ -130,7 +131,11 @@ def get_runner():
         raise HTTPException(status_code=500, detail="Database session error")
 
 # --- Caching ---
-page_session_cache = {}
+# Bounded, insertion-ordered LRU. The key includes the authenticated user so two
+# clients cannot share a cached Table by colliding on X-Page-Session-ID, and the
+# bound stops an unauthenticated caller from growing the dict without limit by
+# sending random session IDs (memory-exhaustion DoS).
+page_session_cache: "OrderedDict[tuple, tuple]" = OrderedDict()
 namespaces = []
 ns_tables = {}
 
@@ -138,7 +143,7 @@ def clean_cache():
     """Remove expired entries from the cache."""
     current_time = time.time()
     keys_to_delete = [
-        key for key, (_, timestamp) in page_session_cache.items()
+        key for key, (_, timestamp) in list(page_session_cache.items())
         if current_time - timestamp > config.CACHE_EXPIRATION
     ]
     for key in keys_to_delete:
@@ -167,6 +172,7 @@ def load_table(table_id: str) -> Table:
         raise HTTPException(status_code=404, detail="Table not found")
 
 def get_table(request: Request, table_id: str):
+    user = None
     if config.AUTH_ENABLED:
         user = check_auth(request)
         if not user:
@@ -176,10 +182,16 @@ def get_table(request: Request, table_id: str):
     if not page_session_id:
         raise HTTPException(status_code=400, detail="Missing X-Page-Session-ID header")
 
-    cache_key = f"{page_session_id}_{table_id}"
-    if cache_key not in page_session_cache:
-        tbl = load_table(table_id)
-        page_session_cache[cache_key] = (tbl, time.time())
-    
-    tbl, _ = page_session_cache[cache_key]
+    # X-Page-Session-ID is chosen by the client, so it is scoped by the
+    # authenticated user rather than trusted on its own.
+    cache_key = (user, page_session_id, table_id)
+    cached = page_session_cache.get(cache_key)
+    if cached is not None:
+        page_session_cache.move_to_end(cache_key)
+        return cached[0]
+
+    tbl = load_table(table_id)
+    page_session_cache[cache_key] = (tbl, time.time())
+    while len(page_session_cache) > config.PAGE_CACHE_MAX_ENTRIES:
+        page_session_cache.popitem(last=False)
     return tbl

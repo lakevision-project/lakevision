@@ -49,15 +49,21 @@
       border-collapse: collapse;
       margin-top: 0px;
     }
-  
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: left;
+
+    /* Long property values (locations, UUID lists) must not push the page wide. */
+    td {
+      overflow-wrap: anywhere;
     }
   
+    th, td {
+      border: 1px solid var(--cds-ui-03, #e0e0e0);
+      padding: 8px;
+      text-align: left;
+      color: var(--cds-text-01, #161616);
+    }
+
     th {
-      background-color: #f5f5f5;
+      background-color: var(--cds-ui-01, #f4f4f4);
     }
   </style>
   

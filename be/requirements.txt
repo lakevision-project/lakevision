@@ -1,20 +1,33 @@
-pyiceberg[s3fs]>=0.7
-pyiceberg[gcsfs]>=0.7
-google.auth>=2.34.0
-pandas>=2.0.0
-fastapi[standard]
-pyarrow>=17.0.0
-uvicorn
-gunicorn
-getdaft[sql]>=0.4.6
+# Pinned with lower+upper bounds so a breaking upstream release cannot silently
+# enter a build. Verified together against the test suite; see the notes below
+# before widening any bound.
+pyiceberg[s3fs,gcsfs]>=0.11.1,<0.12
+google.auth>=2.34.0,<3
+pandas>=2.0.0,<4
+fastapi[standard]>=0.115,<1
+pyarrow>=17.0.0,<26
+uvicorn>=0.34,<1
+gunicorn>=23.0,<24
+
+# `getdaft` is deprecated upstream ("getdaft is now daft"); the project moved to
+# the `daft` distribution. Held at 0.6.x deliberately: every 0.7.x release pins
+# fsspec<2026.5, which conflicts with the fsspec>=2026.7 that current s3fs/gcsfs
+# require, and those back pyiceberg's S3/GCS access. Revisit when daft relaxes it.
+daft[sql]>=0.6.14,<0.7
+
 packaging
 httpx
-authlib
+authlib>=1.6,<2
 itsdangerous
 humanize
-sqlglot
-sqlalchemy
-duckdb>=0.9.2
-croniter
+
+# sql_guard.py depends on sqlglot's AST shape. Node classes for the read_* table
+# functions changed between 26.x and 30.x, so treat a major bump as a code change
+# and run be/tests/test_sql_guard.py against it.
+sqlglot>=30.8,<31
+
+sqlalchemy>=2.0,<3
+duckdb>=0.9.2,<2
+croniter>=6.0,<7
 python-dateutil
-psycopg2-binary
+psycopg2-binary>=2.9,<3

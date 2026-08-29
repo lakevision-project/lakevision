@@ -12,7 +12,7 @@ import pyarrow.compute as pc
 import numpy as np
 import google.auth
 from google.auth.transport.requests import Request
-from sqlglot import parse_one
+from app.sql_guard import validate_and_bind
 import logging
 
 class LakeView():
@@ -104,15 +104,16 @@ class LakeView():
     def get_sample_data(self, table, sql, limit=50):
         df = daft.read_iceberg(table)         
         if sql:
-            logging.info(f"SQL is {sql}")
-            #sql = parse_one(sql).from_("df").sql()
             namespace = table.catalog.namespace_to_string(table.catalog.namespace_from(table.name()))
             if 'default.' in namespace:
                 namespace = namespace.replace('default.', '')
-            table_name = table.catalog.table_name_from(table.name())            
-            sql = sql.replace(f"{namespace}.{table_name}", "df")
-            logging.info(sql)
-            sql_ = parse_one(sql)
+            table_name = table.catalog.table_name_from(table.name())
+            # Validate before execution and bind the table reference to the `df`
+            # alias registered above. Daft's SQL dialect can read arbitrary paths
+            # via read_parquet/read_csv, so this is an authorization boundary:
+            # the query must not be able to name anything but this table.
+            sql = validate_and_bind(sql, f"{namespace}.{table_name}")
+            logging.info("Executing validated SQL: %s", sql)
             df = daft.sql(sql)
             curr_snapshot = table.current_snapshot()
             if (

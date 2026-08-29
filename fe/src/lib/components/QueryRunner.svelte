@@ -72,7 +72,7 @@
             loading.set(true);
             result.set(null);
             const res = await fetch(
-                `/api/tables/${table_id}/${feature}?sql=${fullQuery}`,
+                `/api/tables/${encodeURIComponent(table_id)}/${feature}?sql=${encodeURIComponent(fullQuery)}`,
                 {
                     //method: 'GET',
                     headers: {
@@ -96,10 +96,15 @@
                 const nst = splitBeforeLastDot(tableName);
                 goto("/api/login?namespace="+nst[0]+"&table="+nst[1]+"&sample_limit=100");
 			}
+            else if (statusCode == 400){
+                // Server-side query validation rejected the SQL.
+                const detail = await res.json().catch(() => ({}));
+                error.set(detail.detail || 'Query was rejected by the server.');
+            }
             else if (statusCode == 418){
                 console.error("Failed to fetch data:", res);
-                const detail = await res.json();
-                error.set(detail.message);
+                const detail = await res.json().catch(() => ({}));
+                error.set(detail.message || 'Query could not be executed.');
             }
             else{
                 console.error("Failed to fetch data:", res);
@@ -155,13 +160,13 @@
   <style>
     @use '@carbon/layout' as layout;
     .query-container {
-      max-width: auto;
       margin-left: 10px;
-      
-      padding: 1rem;      
+      padding: 1rem;
+      max-width: 100%;
+      overflow-x: hidden;
     }
     .text-container {
-      max-width: 1000px;        
+      max-width: min(1000px, 100%);
     }
     .generic-container {
         margin-top: 5px;   
