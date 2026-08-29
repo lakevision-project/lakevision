@@ -1,5 +1,12 @@
-pytest
-pandas
-numpy
-pyiceberg[sql-postgres]
-pytest-mock
+# Test-only dependencies. Runtime pins live in requirements.txt.
+pytest>=8.0
+pytest-mock>=3.14
+
+# conftest.py imports the FastAPI app, which pulls in the scheduler modules, so
+# croniter must be present for collection to succeed. It is a runtime dependency
+# too, but installing dev requirements alone should still yield a runnable suite.
+croniter>=6.0,<7
+
+# Local SQLite-backed Iceberg catalog used by the sample-data integration tests
+# and by `make sample-catalog`.
+pyiceberg[sql-sqlite,sql-postgres]>=0.11.1,<0.12
