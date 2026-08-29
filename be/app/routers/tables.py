@@ -5,6 +5,7 @@ from app import config
 from app.dependencies import get_table, lv, authz_, check_auth
 from app.api_utils import df_to_records
 from app.exceptions import LVException
+from app.sql_guard import SQLValidationError
 import logging
 
 router = APIRouter()
@@ -63,9 +64,15 @@ def read_sample_data(request: Request, response: Response, table_id: str, sql: s
     try:
         res = lv.get_sample_data(table, sql, sample_limit)
         return df_to_records(res)
+    except SQLValidationError as e:
+        # User-facing and safe to echo: the validator's messages describe only the
+        # query the caller supplied.
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logging.error(str(e))
-        raise LVException("err", str(e))
+        # Engine/catalog errors can embed storage paths and credential hints, so
+        # log the detail and return something generic.
+        logging.exception("Sample data query failed for %s", table_id)
+        raise LVException("err", "Query could not be executed. Check the server logs for details.")
 
 # ... Add the remaining table endpoints here ...
 # (/schema, /summary, /properties, /partition-specs, /sort-order, /data-change)
