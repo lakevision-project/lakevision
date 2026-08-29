@@ -30,6 +30,7 @@ grep -E '^(PUBLIC_|VITE_)' "$ENV_FILE" >> fe/.env || true
 echo "PUBLIC_API_SERVER_SERVER_SIDE=http://127.0.0.1:${BE_PORT}" >> fe/.env
 
 PIDS=()
+NAMES=()
 cleanup() {
   echo ""
   echo "Shutting down..."
@@ -38,10 +39,16 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+LOG_DIR="${TMPDIR:-/tmp}/lakevision-local"
+mkdir -p "$LOG_DIR"
+echo "  logs: $LOG_DIR"
+
 echo "▶ backend  :${BE_PORT}"
 ( cd be && PYTHONPATH=app ../be/.venv/bin/python -m uvicorn app.api:app \
-    --host 127.0.0.1 --port "${BE_PORT}" --log-level warning ) &
+    --host 127.0.0.1 --port "${BE_PORT}" --log-level warning ) \
+  > "$LOG_DIR/backend.log" 2>&1 &
 PIDS+=($!)
+NAMES+=("backend")
 
 if [ ! -d fe/build ]; then
   echo "▶ building frontend (first run)"
@@ -49,8 +56,10 @@ if [ ! -d fe/build ]; then
 fi
 
 echo "▶ frontend :${FE_PORT}"
-( cd fe && PORT="${FE_PORT}" node build/index.js >/dev/null 2>&1 ) &
+( cd fe && PORT="${FE_PORT}" node build/index.js ) \
+  > "$LOG_DIR/frontend.log" 2>&1 &
 PIDS+=($!)
+NAMES+=("frontend")
 
 # Single-origin router: /api -> backend, everything else -> frontend.
 echo "▶ proxy    :${PORT}"
@@ -67,8 +76,9 @@ http.createServer((req, res) => {
   p.on("error", (e) => { res.writeHead(502); res.end("upstream error: " + e.message); });
   req.pipe(p);
 }).listen(Number(process.env.PORT), "127.0.0.1");
-' &
+' > "$LOG_DIR/proxy.log" 2>&1 &
 PIDS+=($!)
+NAMES+=("proxy")
 
 # Wait for readiness rather than guessing.
 for _ in $(seq 1 120); do
@@ -82,9 +92,15 @@ for _ in $(seq 1 120); do
     # Hold the foreground until a child dies or the user interrupts. `wait`
     # alone returns immediately when this script is not the controlling job.
     while true; do
-      for pid in "${PIDS[@]}"; do
-        if ! kill -0 "$pid" 2>/dev/null; then
-          echo "⚠️  a service exited unexpectedly (pid $pid)"
+      for i in "${!PIDS[@]}"; do
+        if ! kill -0 "${PIDS[$i]}" 2>/dev/null; then
+          name="${NAMES[$i]:-service}"
+          echo ""
+          echo "⚠️  ${name} exited unexpectedly. Last lines of $LOG_DIR/${name}.log:"
+          tail -n 15 "$LOG_DIR/${name}.log" 2>/dev/null | sed 's/^/     /'
+          echo ""
+          echo "   Note: rebuilding the frontend (npm run build) while this is"
+          echo "   running replaces fe/build and will kill the frontend process."
           exit 1
         fi
       done

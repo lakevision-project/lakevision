@@ -1,24 +1,27 @@
 // src/hooks.server.js
+import { dev } from '$app/environment';
 
 export async function handle({ event, resolve }) {
-  console.log('Handle function called with event:', event);
-  // Perform operations before the request is processed (e.g., setting CORS headers)
-  const response = await resolve(event);
+	// Previously logged the entire `event` object on every request, which buried
+	// real output in hundreds of lines and included request cookies. One line, and
+	// only in dev.
+	if (dev) {
+		console.log(`${event.request.method} ${event.url.pathname}`);
+	}
 
-  // Add CORS headers globally
-  response.headers.set('Access-Control-Allow-Origin', '*');
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  // Return the response with modified headers
-  return response;
+	return resolve(event);
+	// No CORS headers here: this server is same-origin with the API behind nginx.
+	// It previously set Access-Control-Allow-Origin: '*' on every response, which
+	// let any site read authenticated page responses.
 }
 
 export async function handleError({ error, event }) {
-  // Custom error handling logic
-  console.error('An error occurred:', error);
-  return {
-    message: 'Something went wrong, please try again later.',
-    code: error.code || 'UNKNOWN_ERROR'
-  };
+	// Log the real cause -- it is otherwise lost, since the client is shown a
+	// generic message deliberately (server errors can carry internal detail).
+	console.error(`Unhandled error on ${event?.request?.method} ${event?.url?.pathname}:`, error);
+
+	return {
+		message: 'Something went wrong, please try again later.',
+		code: error?.code ?? 'UNKNOWN_ERROR'
+	};
 }
