@@ -10,7 +10,8 @@
 	import { ExpandableTile, Search } from 'carbon-components-svelte';
 	import { Catalog, DataTable, Db2Database, Time } from 'carbon-icons-svelte';
 	import JsonTable from '../JsonTable.svelte';
-	import VirtualTable from '../VirtTable3.svelte';
+	import SchemaTable from './SchemaTable.svelte';
+	import PropertyGroups from './PropertyGroups.svelte';
 	import ResourcePanel from './ResourcePanel.svelte';
 	import Section from './Section.svelte';
 	import StatTile from './StatTile.svelte';
@@ -48,17 +49,17 @@
 
 	$: s = $summary.data ?? {};
 
-	// Schema filtering lives here rather than inside VirtTable3, so the control can
-	// sit in the section header instead of floating above the table.
+	// Field names used as partition/sort keys, so the schema can mark them and the
+	// three panels stop having to be joined by eye.
+	$: partitionFields = ($partitionSpecs.data ?? [])
+		.map((/** @type {any} */ p) => p?.Field)
+		.filter(Boolean);
+	$: sortFields = ($sortOrder.data ?? [])
+		.map((/** @type {any} */ o) => o?.Field)
+		.filter(Boolean);
+
+	// Held here so the control can sit in the section header; SchemaTable applies it.
 	let schemaFilter = '';
-	$: filteredSchema = (() => {
-		const rows = $schema.data ?? [];
-		const q = schemaFilter.trim().toLowerCase();
-		if (!q) return rows;
-		return rows.filter((/** @type {any} */ r) =>
-			Object.values(r ?? {}).some((v) => String(v ?? '').toLowerCase().includes(q))
-		);
-	})();
 
 	// Derived figures the API does not return, computed from what it does.
 	$: avgFile = averageFileSize(parseSize(s['Total file size']), s['Total data files']);
@@ -116,6 +117,27 @@
 		</div>
 	</ResourcePanel>
 
+	<!-- Schema is the primary thing people read, so it leads at full width rather
+	     than competing for half with an unbounded property list. -->
+	<Section title="Schema" count={($schema.data ?? []).length}>
+		<svelte:fragment slot="actions">
+			{#if ($schema.data ?? []).length > 8}
+				<div class="section-search">
+					<Search
+						size="sm"
+						bind:value={schemaFilter}
+						labelText="Filter schema fields"
+						placeholder="Filter fields..."
+					/>
+				</div>
+			{/if}
+		</svelte:fragment>
+		<ResourcePanel resource={$schema} rows={6} columns={5} label="schema">
+			<SchemaTable rows={$schema.data} {partitionFields} {sortFields} filter={schemaFilter} />
+		</ResourcePanel>
+	</Section>
+
+	<!-- Short, fixed-size panels sit together; none of them grows unboundedly. -->
 	<div class="columns">
 		<div class="col">
 			<Section title="Table details" collapsible={false}>
@@ -127,55 +149,8 @@
 					/>
 				</ResourcePanel>
 			</Section>
-
-			<Section title="Properties" count={Object.keys($properties.data ?? {}).length}>
-				<ResourcePanel
-					resource={$properties}
-					skeleton="text"
-					rows={4}
-					label="properties"
-					emptyMessage="No table properties set."
-				>
-					<KeyValueList data={$properties.data} />
-				</ResourcePanel>
-			</Section>
 		</div>
-
 		<div class="col">
-			<Section title="Schema" count={($schema.data ?? []).length}>
-				<svelte:fragment slot="actions">
-					{#if ($schema.data ?? []).length > 8}
-						<div class="section-search">
-							<Search
-								size="sm"
-								bind:value={schemaFilter}
-								labelText="Filter schema fields"
-								placeholder="Filter fields..."
-							/>
-						</div>
-					{/if}
-				</svelte:fragment>
-				<ResourcePanel
-					resource={$schema}
-					rows={6}
-					columns={5}
-					label="schema"
-					emptyMessage="No schema information."
-				>
-					<VirtualTable
-						data={filteredSchema}
-						columns={$schema.data[0]}
-						rowHeight={37}
-						tableHeight={Math.min(420, (filteredSchema.length + 1) * 37)}
-						defaultColumnWidth={130}
-						storageKey="schema"
-					/>
-					{#if schemaFilter && filteredSchema.length === 0}
-						<p class="no-match">No fields match “{schemaFilter}”.</p>
-					{/if}
-				</ResourcePanel>
-			</Section>
-
 			<Section title="Partitioning" count={($partitionSpecs.data ?? []).length}>
 				<ResourcePanel
 					resource={$partitionSpecs}
@@ -201,6 +176,14 @@
 			</Section>
 		</div>
 	</div>
+
+	<!-- Last: this is the one panel whose height is driven by the table's own
+	     configuration, ranging from 1 to 26 entries across our catalog. -->
+	<Section title="Properties" count={Object.keys($properties.data ?? {}).length}>
+		<ResourcePanel resource={$properties} skeleton="text" rows={4} label="properties">
+			<PropertyGroups properties={$properties.data} />
+		</ResourcePanel>
+	</Section>
 
 	{#if namespaceProperties}
 		<ExpandableTile light>
