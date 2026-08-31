@@ -34,7 +34,12 @@
 	{#if skeleton === 'text'}
 		<SkeletonText paragraph lines={rows} />
 	{:else}
-		<DataTableSkeleton rowCount={rows} columnCount={columns} showHeader={false} showToolbar={false} />
+		<DataTableSkeleton
+			rowCount={rows}
+			columnCount={columns}
+			showHeader={false}
+			showToolbar={false}
+		/>
 	{/if}
 {:else if resource.error instanceof ForbiddenError}
 	<ToastNotification
@@ -59,8 +64,11 @@
 {/if}
 
 <style>
+	/* Compact: an empty section should not occupy as much room as a populated one. */
 	.empty {
 		color: var(--cds-text-02, #525252);
-		padding: 0.5rem 0;
+		font-size: 0.8125rem;
+		padding: 0.25rem 0;
+		margin: 0;
 	}
 </style>

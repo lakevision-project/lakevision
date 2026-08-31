@@ -207,3 +207,15 @@ span.bx--text-truncate--end {
 		overflow-x: hidden;
 	}
 }
+
+/* Metadata key/value lists share one key-column width so they align down the
+   page. Sizing each list to its own content produced four different widths
+   (128/175/279/159px) on a single view. */
+:root {
+	--lv-key-col: 15rem;
+}
+@media (max-width: 1056px) {
+	:root {
+		--lv-key-col: 11rem;
+	}
+}
