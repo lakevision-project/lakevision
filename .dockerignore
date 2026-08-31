@@ -1,0 +1,35 @@
+# Secrets must never enter the build context: the Dockerfile does `COPY ./fe/ .`,
+# which would otherwise bake fe/.env into the image and publish it with the push.
+.env
+.env.*
+!.env.example
+fe/.env
+cos.env
+# my.env is the committed template (placeholders only) and is deliberately not
+# listed here -- excluding it would imply it holds secrets.
+
+# Dependencies are installed inside the image; copying host builds in is both
+# slow (860 MB) and wrong (host is arm64, image may be amd64).
+**/node_modules
+be/.venv
+fe/.svelte-kit
+fe/build
+
+# Repo/tooling noise
+.git
+.github
+.mypy_cache
+.pytest_cache
+**/__pycache__
+*.pyc
+.DS_Store
+
+# Local-only helpers and scratch work
+run-local.sh
+agent/
+dev/
+k8s/
+assets/
+logo.html
+*.md
+!README.md
