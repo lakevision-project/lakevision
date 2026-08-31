@@ -36,7 +36,9 @@
 		{#each entries as [key, value] (key)}
 			<dt>{key}</dt>
 			<dd class:mono={isMono(key, value)}>
-				<span class="val">{value === '' || value === null || value === undefined ? '—' : value}</span>
+				<span class="val"
+					>{value === '' || value === null || value === undefined ? '—' : value}</span
+				>
 				{#if copyableKeys.includes(key) && value}
 					<span class="copy">
 						<CopyButton text={String(value)} iconDescription="Copy {key}" feedback="Copied" />
@@ -50,8 +52,10 @@
 <style>
 	.kv {
 		display: grid;
-		/* Key column sizes to content but never crowds the value. */
-		grid-template-columns: minmax(8rem, max-content) 1fr;
+		/* Consistent key column, but capped relative to the container so a narrow
+		   column does not starve the value: a full 15rem key inside a 520px column
+		   left an S3 path only ~200px and wrapped it to three lines. */
+		grid-template-columns: minmax(0, min(var(--lv-key-col, 15rem), 38%)) 1fr;
 		gap: 0 1.5rem;
 		margin: 0;
 	}
@@ -70,7 +74,7 @@
 		color: var(--cds-text-01, #161616);
 		display: flex;
 		align-items: flex-start;
-		gap: 0.25rem;
+		gap: 0.5rem;
 		overflow-wrap: anywhere;
 	}
 	dd.mono .val {
@@ -80,10 +84,14 @@
 	}
 	.val {
 		min-width: 0;
+		flex: 1;
 	}
 	.copy {
 		flex-shrink: 0;
-		margin-top: -0.375rem;
+		/* Pull the 32px Carbon button back into the row's line height so it does
+		   not add vertical space to every row that has one. .val's flex: 1
+		   already holds it against the right edge. */
+		margin: -0.375rem 0;
 	}
 	.empty {
 		color: var(--cds-text-02, #525252);

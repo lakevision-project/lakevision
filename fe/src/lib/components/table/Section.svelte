@@ -15,18 +15,43 @@
 	export let open = true;
 	/** Set false for a static panel with no collapse affordance. */
 	export let collapsible = true;
+	/**
+	 * Collapse automatically once the panel is known to be empty.
+	 *
+	 * An empty Partitioning / Sort order / Properties panel costs as much vertical
+	 * space as a populated one while saying only "not partitioned". Callers pass
+	 * this as `true` only when the data has actually loaded without error, so a
+	 * still-loading or failed panel stays open and its skeleton/error stays
+	 * visible.
+	 *
+	 * Applied once per transition into the empty state rather than reactively, so
+	 * a user who expands an empty panel is not immediately re-collapsed.
+	 */
+	/** @type {boolean} */
+	export let collapseWhenEmpty = false;
+
+	let autoCollapsed = false;
+	$: if (collapsible && collapseWhenEmpty && !autoCollapsed) {
+		open = false;
+		autoCollapsed = true;
+	} else if (!collapseWhenEmpty && autoCollapsed) {
+		// Re-arm, so switching to another empty table collapses again.
+		autoCollapsed = false;
+	}
 </script>
 
 <section class="section">
 	<div class="header">
 		{#if collapsible}
-			<button
-				type="button"
-				class="toggle"
-				aria-expanded={open}
-				on:click={() => (open = !open)}
-			>
-				<svg class="chev" class:closed={!open} width="16" height="16" viewBox="0 0 32 32" aria-hidden="true">
+			<button type="button" class="toggle" aria-expanded={open} on:click={() => (open = !open)}>
+				<svg
+					class="chev"
+					class:closed={!open}
+					width="16"
+					height="16"
+					viewBox="0 0 32 32"
+					aria-hidden="true"
+				>
 					<path fill="currentColor" d="M16 22L6 12l1.4-1.4 8.6 8.6 8.6-8.6L26 12z" />
 				</svg>
 				<h3>{title}</h3>
@@ -48,7 +73,7 @@
 
 <style>
 	.section {
-		margin-bottom: 2rem;
+		margin-bottom: 1.75rem;
 		min-width: 0;
 	}
 	.header {
@@ -58,7 +83,7 @@
 		gap: 1rem;
 		border-bottom: 1px solid var(--cds-ui-03, #e0e0e0);
 		padding-bottom: 0.5rem;
-		margin-bottom: 1rem;
+		margin-bottom: 0.875rem;
 	}
 	.toggle,
 	.static-header {

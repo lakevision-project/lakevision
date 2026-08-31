@@ -34,7 +34,9 @@
 				? g.entries.filter(
 						(/** @type {any} */ e) =>
 							e.key.toLowerCase().includes(needle) ||
-							String(e.value ?? '').toLowerCase().includes(needle)
+							String(e.value ?? '')
+								.toLowerCase()
+								.includes(needle)
 					)
 				: g.entries
 		}))
@@ -69,53 +71,55 @@
 		<p class="empty">No properties match “{filter}”.</p>
 	{/if}
 
-	{#each groups as group (group.group)}
-		{@const isOpen = showAll || expanded[group.group]}
-		{@const shown = isOpen ? group.entries : group.entries.slice(0, previewCount)}
-		{@const hidden = group.entries.length - shown.length}
-		<section class="group">
-			<h4>
-				<span class="gname">{group.group}</span>
-				<span class="gcount">{group.entries.length}</span>
-			</h4>
-			<dl>
-				{#each shown as entry (entry.key)}
-					<dt title={entry.key}>{entry.label}</dt>
-					<dd>
-						{#if isLong(entry.value)}
-							<button
-								type="button"
-								class="value long"
-								title="Show full value"
-								on:click={() => (detail = detail === entry.key ? null : entry.key)}
-							>
-								{entry.value}
-							</button>
-							<CopyButton
-								text={String(entry.value)}
-								iconDescription="Copy value"
-								feedback="Copied"
-							/>
-						{:else}
-							<span class="value">{entry.value === '' ? '—' : entry.value}</span>
-						{/if}
-						{#if detail === entry.key}
-							<pre class="full">{entry.value}</pre>
-						{/if}
-					</dd>
-				{/each}
-			</dl>
-			{#if hidden > 0}
-				<button type="button" class="more" on:click={() => (expanded[group.group] = true)}>
-					Show {hidden} more
-				</button>
-			{:else if isOpen && !showAll && group.entries.length > previewCount}
-				<button type="button" class="more" on:click={() => (expanded[group.group] = false)}>
-					Show fewer
-				</button>
-			{/if}
-		</section>
-	{/each}
+	<div class="groups">
+		{#each groups as group (group.group)}
+			{@const isOpen = showAll || expanded[group.group]}
+			{@const shown = isOpen ? group.entries : group.entries.slice(0, previewCount)}
+			{@const hidden = group.entries.length - shown.length}
+			<section class="group">
+				<h4>
+					<span class="gname">{group.group}</span>
+					<span class="gcount">{group.entries.length}</span>
+				</h4>
+				<dl>
+					{#each shown as entry (entry.key)}
+						<dt title={entry.key}>{entry.label}</dt>
+						<dd>
+							{#if isLong(entry.value)}
+								<button
+									type="button"
+									class="value long"
+									title="Show full value"
+									on:click={() => (detail = detail === entry.key ? null : entry.key)}
+								>
+									{entry.value}
+								</button>
+								<CopyButton
+									text={String(entry.value)}
+									iconDescription="Copy value"
+									feedback="Copied"
+								/>
+							{:else}
+								<span class="value">{entry.value === '' ? '—' : entry.value}</span>
+							{/if}
+							{#if detail === entry.key}
+								<pre class="full">{entry.value}</pre>
+							{/if}
+						</dd>
+					{/each}
+				</dl>
+				{#if hidden > 0}
+					<button type="button" class="more" on:click={() => (expanded[group.group] = true)}>
+						Show {hidden} more
+					</button>
+				{:else if isOpen && !showAll && group.entries.length > previewCount}
+					<button type="button" class="more" on:click={() => (expanded[group.group] = false)}>
+						Show fewer
+					</button>
+				{/if}
+			</section>
+		{/each}
+	</div>
 {/if}
 
 <style>
@@ -123,8 +127,17 @@
 		margin-bottom: 1rem;
 		max-width: 18rem;
 	}
+	/* Groups flow into columns so a full-width section is actually filled, rather
+	   than a 1088px header rule sitting over a 288px list. */
+	.groups {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(26rem, 1fr));
+		gap: 0 3rem;
+		align-items: start;
+	}
 	.group {
 		margin-bottom: 1.25rem;
+		min-width: 0;
 	}
 	h4 {
 		display: flex;
@@ -148,7 +161,9 @@
 	}
 	dl {
 		display: grid;
-		grid-template-columns: minmax(7rem, max-content) 1fr;
+		/* Same rule as Table details, so the two align while still leaving the
+		   value room in a narrow column. */
+		grid-template-columns: minmax(0, min(var(--lv-key-col, 15rem), 45%)) 1fr;
 		gap: 0 1.25rem;
 		margin: 0;
 	}
@@ -168,6 +183,7 @@
 		margin: 0;
 		display: flex;
 		align-items: flex-start;
+		flex-wrap: wrap;
 		gap: 0.25rem;
 		color: var(--cds-text-01, #161616);
 		min-width: 0;
@@ -194,14 +210,15 @@
 		font-size: 0.75rem;
 	}
 	.full {
-		grid-column: 1 / -1;
+		/* A flex child of dd, not a grid child of dl: grid-column would be inert
+		   here, so claim the whole line with flex-basis instead. */
+		flex: 0 0 100%;
 		margin: 0.375rem 0 0;
 		padding: 0.5rem 0.625rem;
 		background-color: var(--cds-ui-01, #f4f4f4);
 		font-size: 0.75rem;
 		white-space: pre-wrap;
 		overflow-wrap: anywhere;
-		width: 100%;
 	}
 	.more {
 		margin-top: 0.5rem;

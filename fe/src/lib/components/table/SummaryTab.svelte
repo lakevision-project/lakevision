@@ -54,9 +54,24 @@
 	$: partitionFields = ($partitionSpecs.data ?? [])
 		.map((/** @type {any} */ p) => p?.Field)
 		.filter(Boolean);
-	$: sortFields = ($sortOrder.data ?? [])
-		.map((/** @type {any} */ o) => o?.Field)
-		.filter(Boolean);
+	$: sortFields = ($sortOrder.data ?? []).map((/** @type {any} */ o) => o?.Field).filter(Boolean);
+
+	/**
+	 * An empty optional panel collapses itself, so a table with no partitioning,
+	 * no sort order and no properties does not scroll past three headers that each
+	 * say only that something is absent. Gated on `loaded && !error` so a
+	 * still-loading or failed panel stays open with its skeleton or error visible.
+	 *
+	 * @param {{ data: any, error: Error | null, loaded: boolean }} r
+	 */
+	function isEmptyResource(r) {
+		if (!r.loaded || r.error) return false;
+		const d = r.data;
+		if (d == null) return true;
+		if (Array.isArray(d)) return d.length === 0;
+		if (typeof d === 'object') return Object.keys(d).length === 0;
+		return false;
+	}
 
 	// Held here so the control can sit in the section header; SchemaTable applies it.
 	let schemaFilter = '';
@@ -151,7 +166,11 @@
 			</Section>
 		</div>
 		<div class="col">
-			<Section title="Partitioning" count={($partitionSpecs.data ?? []).length}>
+			<Section
+				title="Partitioning"
+				count={($partitionSpecs.data ?? []).length}
+				collapseWhenEmpty={isEmptyResource($partitionSpecs)}
+			>
 				<ResourcePanel
 					resource={$partitionSpecs}
 					rows={2}
@@ -163,7 +182,11 @@
 				</ResourcePanel>
 			</Section>
 
-			<Section title="Sort order" count={($sortOrder.data ?? []).length}>
+			<Section
+				title="Sort order"
+				count={($sortOrder.data ?? []).length}
+				collapseWhenEmpty={isEmptyResource($sortOrder)}
+			>
 				<ResourcePanel
 					resource={$sortOrder}
 					rows={2}
@@ -179,7 +202,11 @@
 
 	<!-- Last: this is the one panel whose height is driven by the table's own
 	     configuration, ranging from 1 to 26 entries across our catalog. -->
-	<Section title="Properties" count={Object.keys($properties.data ?? {}).length}>
+	<Section
+		title="Properties"
+		count={Object.keys($properties.data ?? {}).length}
+		collapseWhenEmpty={isEmptyResource($properties)}
+	>
 		<ResourcePanel resource={$properties} skeleton="text" rows={4} label="properties">
 			<PropertyGroups properties={$properties.data} />
 		</ResourcePanel>
