@@ -120,6 +120,7 @@ docker build --build-arg ENABLE_SAMPLE_CATALOG=true -t lakevision:1.0 .
 </details> 
 
 Demo
+
 https://github.com/user-attachments/assets/33fddb4e-0119-442a-bcc9-81c17329d47d
 
 ## 🛠️ Running Locally (Terminal or VS Code)
