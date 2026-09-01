@@ -1,4 +1,5 @@
 
+
 <p align="center">
   <img src="https://github.com/lakevision-project/lakevision/blob/main/assets/lakevision1.png" alt="lakevision logo">
 </p>
@@ -37,7 +38,7 @@ Lakevision is built with **pyiceberg**, a `FastAPI` backend, and a `SvelteKit` f
 -->
 
 
-https://github.com/user-attachments/assets/b6b2eef5-9f27-40ca-a80d-27b88d4a8cfd
+https://github.com/user-attachments/assets/33fddb4e-0119-442a-bcc9-81c17329d47d
 
 
 
