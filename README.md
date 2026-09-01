@@ -1,5 +1,6 @@
 
 
+
 <p align="center">
   <img src="https://github.com/lakevision-project/lakevision/blob/main/assets/lakevision1.png" alt="lakevision logo">
 </p>
@@ -37,9 +38,7 @@ Lakevision is built with **pyiceberg**, a `FastAPI` backend, and a `SvelteKit` f
 > 👉 Check the ["Live Demo"](http://host-tbd) to explore Lakevision’s features with sample data.
 -->
 
-
-https://github.com/user-attachments/assets/33fddb4e-0119-442a-bcc9-81c17329d47d
-
+<img width="1100" height="619" alt="lakevision-demo" src="https://github.com/user-attachments/assets/8c45a494-aa26-4e8c-9484-2f8b77d44acc" />
 
 
 ## Features
@@ -119,6 +118,9 @@ docker build --build-arg ENABLE_SAMPLE_CATALOG=true -t lakevision:1.0 .
 - Then run the container as above
 
 </details> 
+
+Demo
+https://github.com/user-attachments/assets/33fddb4e-0119-442a-bcc9-81c17329d47d
 
 ## 🛠️ Running Locally (Terminal or VS Code)
 
