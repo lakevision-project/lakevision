@@ -1,8 +1,9 @@
 # bookworm (not trixie) keeps Debian's python3 at 3.11, matching CI. The
 # base image supplies both runtimes here, so changing the suite would move
 # the backend's Python version too.
-FROM node:24.20.0-bookworm AS builder
+FROM node:24.20.0-bookworm-slim AS builder
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends nginx python3 python3-pip && \
     rm -rf /var/lib/apt/lists/*
 RUN rm /usr/lib/python3.*/EXTERNALLY-MANAGED && python3 -m pip install --upgrade pip
