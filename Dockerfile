@@ -23,11 +23,23 @@ COPY worker.sh /app/worker.sh
 RUN chmod 755 /app/worker.sh
 #USER lv
 
-FROM be
-WORKDIR /app/fe
+# Frontend is built here, at image build time, not in start.sh. Only the
+# built bundle + production deps reach the runtime image, so build-only
+# tooling (vite, esbuild's Go binaries, eslint, ...) is not shipped -- that
+# tooling carried CVE-2025-68121 (Go stdlib in esbuild). The UI reads its
+# config via $env/dynamic/public, i.e. at runtime, so a build-time build is safe.
+FROM node:24.20.0-bookworm-slim AS fe-build
+WORKDIR /fe
 COPY ./fe/package*.json ./
 RUN npm ci
 COPY ./fe/ .
+RUN npm run build && npm prune --omit=dev
+
+FROM be
+WORKDIR /app/fe
+COPY --from=fe-build /fe/package.json ./
+COPY --from=fe-build /fe/node_modules ./node_modules
+COPY --from=fe-build /fe/build ./build
 
 COPY nginx.conf /etc/nginx/
 
