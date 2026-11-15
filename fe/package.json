@@ -43,5 +43,8 @@
 		"dompurify": "^3.4.17",
 		"lodash-es": "^4.18.0",
 		"marked": "^15.0.7"
+	},
+	"overrides": {
+		"devalue": "^5.9.3"
 	}
 }
