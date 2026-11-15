@@ -1,12 +1,16 @@
-# bookworm (not trixie) keeps Debian's python3 at 3.11, matching CI. The
-# base image supplies both runtimes here, so changing the suite would move
-# the backend's Python version too.
-FROM node:24.20.0-bookworm-slim AS builder
+# Runtime is Debian 13 (trixie). Python stays at 3.11 -- matching CI -- by taking
+# it from the official python:3.11-slim-trixie image instead of Debian's python3
+# (trixie ships 3.13). Node comes from the matching official node image.
+FROM node:24.20.0-trixie-slim AS node
+FROM python:3.11-slim-trixie AS builder
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+# Only the node binary: the runtime runs `node build`, never npm (npm's own
+# bundled deps -- undici, tar, brace-expansion, ip-address -- were 10 of 14 node CVEs).
 RUN apt-get update && \
     apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends nginx python3 python3-pip && \
-    rm -rf /var/lib/apt/lists/*
-RUN rm /usr/lib/python3.*/EXTERNALLY-MANAGED && python3 -m pip install --upgrade pip
+    apt-get install -y --no-install-recommends nginx libstdc++6 && \
+    rm -rf /var/lib/apt/lists/* && \
+    python3 -m pip install --no-cache-dir --upgrade pip setuptools
 
 FROM builder AS be
 ENV PYTHONUNBUFFERED=1
@@ -28,7 +32,10 @@ RUN chmod 755 /app/worker.sh
 # tooling (vite, esbuild's Go binaries, eslint, ...) is not shipped -- that
 # tooling carried CVE-2025-68121 (Go stdlib in esbuild). The UI reads its
 # config via $env/dynamic/public, i.e. at runtime, so a build-time build is safe.
-FROM node:24.20.0-bookworm-slim AS fe-build
+# Runs on the build host's platform: its output is platform-independent JS (the
+# pruned runtime deps have no native code), and esbuild's Go binary crashes under
+# QEMU emulation ("fatal error: lfstack.push") when cross-building amd64 on arm64.
+FROM --platform=$BUILDPLATFORM node:24.20.0-trixie-slim AS fe-build
 WORKDIR /fe
 COPY ./fe/package*.json ./
 RUN npm ci
