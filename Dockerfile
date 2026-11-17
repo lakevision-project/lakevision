@@ -1,15 +1,15 @@
-# Runtime is Debian 13 (trixie). Python stays at 3.11 -- matching CI -- by taking
-# it from the official python:3.11-slim-trixie image instead of Debian's python3
-# (trixie ships 3.13). Node comes from the matching official node image.
+# Runtime is Red Hat UBI 10 minimal (freely redistributable, no subscription needed).
+# UBI 10 ships Python 3.12 (there is no UBI 3.11 without the much larger s2i image), so
+# CI runs 3.12 too. Node comes from the official node image (glibc 2.28 baseline, so it
+# runs on UBI 10's glibc 2.39). openssl-libs and ca-certificates ship in ubi-minimal.
 FROM node:24.20.0-trixie-slim AS node
-FROM python:3.11-slim-trixie AS builder
+FROM registry.access.redhat.com/ubi10/ubi-minimal:10.3 AS builder
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 # Only the node binary: the runtime runs `node build`, never npm (npm's own
 # bundled deps -- undici, tar, brace-expansion, ip-address -- were 10 of 14 node CVEs).
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends nginx libstdc++6 && \
-    rm -rf /var/lib/apt/lists/* && \
+RUN microdnf -y upgrade && \
+    microdnf -y install python3.12 python3.12-pip nginx libstdc++ && \
+    microdnf clean all && \
     python3 -m pip install --no-cache-dir --upgrade pip setuptools
 
 FROM builder AS be
@@ -18,7 +18,7 @@ ENV PYTHONUNBUFFERED=1
 RUN mkdir -p /app
 WORKDIR /app/be
 COPY ./be/requirements.txt ./
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
+RUN python3 -m pip install --no-cache-dir --upgrade -r requirements.txt
 COPY ./be/app ./app
 
 COPY start.sh /app/start.sh
@@ -65,6 +65,11 @@ RUN if [ "$ENABLE_SAMPLE_CATALOG" = "true" ]; then \
       env && \
       python3 /app/scripts/load_sample_data.py; \
     fi
+
+# pip is only needed at build time. Removing it (the upgraded copy and the RPM) leaves no
+# installer in the runtime image; pip's vendored SBOM (pip/_vendor/bom.cdx.json) also made
+# scanners report a setuptools 70.3.0 that is not installed.
+RUN python3 -m pip uninstall -y pip && microdnf -y remove python3.12-pip && microdnf clean all
 
 #fix later, this is for OCP
 RUN chmod -R 777 /app/ && chmod -R 777 /var/lib/nginx/
